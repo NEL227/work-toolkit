@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体[テスト]
 // @namespace    http://tampermonkey.net/
-// @version      1.5.6
+// @version      1.5.7
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -2505,31 +2505,35 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
             });
         };
 
-        const needsUpdate = (lastUpdated) => {
-            const now = Date.now();
-            let lastUpdatedDate;
+const needsUpdate = (lastUpdated) => {
+    const now = Date.now();
+    let lastUpdatedDate;
+    if (typeof lastUpdated === "number") {
+        lastUpdatedDate = new Date(lastUpdated);
+    } else if (typeof lastUpdated === "string") {
+        lastUpdatedDate = new Date(lastUpdated.replace(/\//g, "-"));
+    } else {
+        return true;
+    }
+    if (isNaN(lastUpdatedDate.getTime())) return true;
 
-            if (typeof lastUpdated === "string") {
-                lastUpdatedDate = new Date(lastUpdated.replace(/\//g, "-"));
-            } else if (typeof lastUpdated === "number") {
-                lastUpdatedDate = new Date(lastUpdated);
-            } else {
-                return true;
-            }
+    const oneWeek = 7 * 24 * 60 * 60 * 1000;
+    const lastUpdateDay = lastUpdatedDate.getDay();
+    const currentDay = new Date().getDay();
 
-            if (isNaN(lastUpdatedDate.getTime())) return true;
+    // ★ここで値を出す！
+    console.log("now:", now);
+    console.log("lastUpdatedDate.getTime():", lastUpdatedDate.getTime());
+    console.log("now - lastUpdatedDate.getTime():", now - lastUpdatedDate.getTime());
+    console.log("oneWeek:", oneWeek);
+    console.log("一週間経過判定:", now - lastUpdatedDate.getTime() > oneWeek);
+    console.log("lastUpdateDay:", lastUpdateDay);
+    console.log("currentDay:", currentDay);
 
-            const oneWeek = 7 * 24 * 60 * 60 * 1000;
-            const lastUpdateDay = lastUpdatedDate.getDay();
-            const currentDay = new Date().getDay();
-
-            const lastUpdateWasMonday = lastUpdateDay === 1;
-            const todayIsMonday = currentDay === 1;
-
-            return (now - lastUpdatedDate.getTime() > oneWeek)
-            || !lastUpdateWasMonday
-            || todayIsMonday;
-        };
+    if (now - lastUpdatedDate.getTime() > oneWeek) return true;
+    if (lastUpdateDay !== 1 && currentDay === 1) return true;
+    return false;
+};
 
 
         const fetchAndUpdateData = async (db) => {
