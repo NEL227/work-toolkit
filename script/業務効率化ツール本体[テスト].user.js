@@ -2537,7 +2537,7 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                 const response = await fetch('https://nel227.github.io/work-toolkit/directories.json');
                 const data = await response.json();
 
-                const lastUpdated = data.lastUpdated;
+        const lastUpdated = Date.now();
 
                 await saveDataToIndexedDB(db, { data, lastUpdated });
                 return { data, lastUpdated };
