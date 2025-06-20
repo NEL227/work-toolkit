@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.5.3
+// @version      1.5.4
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -599,13 +599,13 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
         const url = window.location.href;
         for (const page of pageScriptList) {
             if (page.urlPattern.test(url)) {
-                console.log(`[ページ検出] ${page.pageName}`);
+                // console.log(`[ページ検出] ${page.pageName}`);
                 page.scripts.forEach(script => {
                     if (script.isEnabled()) {
-                        console.log(`実行: ${script.name}`);
+                        // console.log(`実行: ${script.name}`);
                         script.run();
                     } else {
-                        console.log(`無効: ${script.name}`);
+                        // console.log(`無効: ${script.name}`);
                     }
                 });
                 break;
@@ -2488,30 +2488,43 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                 const transaction = db.transaction(['directories'], 'readwrite');
                 const objectStore = transaction.objectStore('directories');
 
+                const dataWithId = { id: 'directoryData', ...data };
+
                 const request = objectStore.put({ id: 'directoryData', ...data });
 
-                transaction.onerror = (event) => {
-                    console.error("IndexedDBへのデータ保存中にエラーが発生しました:", event.target.error);
+                request.onsuccess = () => {
+                    resolve();
+                };
+                request.onerror = (event) => {
+                    console.error('IndexedDB保存失敗', event.target.error);
                     reject(event.target.error);
                 };
-
-                transaction.oncomplete = () => {
-                    resolve();
+                transaction.onerror = (event) => {
+                    console.error('IndexedDBトランザクションエラー', event.target.error);
+                    reject(event.target.error);
                 };
             });
         };
 
         const needsUpdate = (lastUpdated) => {
             const now = Date.now();
-            const lastUpdatedDate = new Date(lastUpdated);
+            let lastUpdatedDate;
+            if (typeof lastUpdated === "number") {
+                lastUpdatedDate = new Date(lastUpdated);
+            } else if (typeof lastUpdated === "string") {
+                lastUpdatedDate = new Date(lastUpdated.replace(/\//g, "-"));
+            } else {
+                return true;
+            }
+            if (isNaN(lastUpdatedDate.getTime())) return true;
+
             const oneWeek = 7 * 24 * 60 * 60 * 1000;
             const lastUpdateDay = lastUpdatedDate.getDay();
             const currentDay = new Date().getDay();
 
-            const lastUpdateWasMonday = lastUpdateDay === 1;
-            const todayIsMonday = currentDay === 1;
-
-            return !lastUpdated || (now - lastUpdated > oneWeek) || !lastUpdateWasMonday || todayIsMonday;
+            if (now - lastUpdatedDate.getTime() > oneWeek) return true;
+            if (lastUpdateDay !== 1 && currentDay === 1) return true;
+            return false;
         };
 
         const fetchAndUpdateData = async (db) => {
@@ -2519,7 +2532,7 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                 const response = await fetch('https://nel227.github.io/work-toolkit/directories.json');
                 const data = await response.json();
 
-                const lastUpdated = data.lastUpdated;
+                const lastUpdated = Date.now();
 
                 await saveDataToIndexedDB(db, { data, lastUpdated });
                 return { data, lastUpdated };
@@ -2533,6 +2546,8 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
             try {
                 const db = await openIndexedDB();
                 let directoryData = await getDataFromIndexedDB(db);
+
+                const lastUpdated = directoryData && directoryData.lastUpdated;
 
                 if (!directoryData || needsUpdate(directoryData.lastUpdated)) {
                     directoryData = await fetchAndUpdateData(db);
@@ -11895,4 +11910,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: 18449d2cd7d2e6ae0f82883e933eb69a8c79d20640d2ac5907329b15c3825b83
+// @integrity-hash: 8d04889b08d236abe5ef6df4267997d632759a243d043ea9094de0064b29a3b3
