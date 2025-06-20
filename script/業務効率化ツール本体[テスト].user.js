@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体[テスト]
 // @namespace    http://tampermonkey.net/
-// @version      1.5.3
+// @version      1.5.4
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -2486,22 +2486,39 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                 const transaction = db.transaction(['directories'], 'readwrite');
                 const objectStore = transaction.objectStore('directories');
 
+                const dataWithId = { id: 'directoryData', ...data };
+
                 const request = objectStore.put({ id: 'directoryData', ...data });
 
-                transaction.onerror = (event) => {
-                    console.error("IndexedDBへのデータ保存中にエラーが発生しました:", event.target.error);
+                request.onsuccess = () => {
+                    console.log('IndexedDB保存成功');
+                    resolve();
+                };
+                request.onerror = (event) => {
+                    console.error('IndexedDB保存失敗', event.target.error);
                     reject(event.target.error);
                 };
-
-                transaction.oncomplete = () => {
-                    resolve();
+                transaction.onerror = (event) => {
+                    console.error('IndexedDBトランザクションエラー', event.target.error);
+                    reject(event.target.error);
                 };
             });
         };
 
         const needsUpdate = (lastUpdated) => {
             const now = Date.now();
-            const lastUpdatedDate = new Date(lastUpdated);
+            let lastUpdatedDate;
+
+            if (typeof lastUpdated === "string") {
+                lastUpdatedDate = new Date(lastUpdated.replace(/\//g, "-"));
+            } else if (typeof lastUpdated === "number") {
+                lastUpdatedDate = new Date(lastUpdated);
+            } else {
+                return true;
+            }
+
+            if (isNaN(lastUpdatedDate.getTime())) return true;
+
             const oneWeek = 7 * 24 * 60 * 60 * 1000;
             const lastUpdateDay = lastUpdatedDate.getDay();
             const currentDay = new Date().getDay();
@@ -2509,7 +2526,9 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
             const lastUpdateWasMonday = lastUpdateDay === 1;
             const todayIsMonday = currentDay === 1;
 
-            return !lastUpdated || (now - lastUpdated > oneWeek) || !lastUpdateWasMonday || todayIsMonday;
+            return (now - lastUpdatedDate.getTime() > oneWeek)
+            || !lastUpdateWasMonday
+            || todayIsMonday;
         };
 
         const fetchAndUpdateData = async (db) => {
