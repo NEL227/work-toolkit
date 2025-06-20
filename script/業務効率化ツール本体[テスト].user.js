@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体[テスト]
 // @namespace    http://tampermonkey.net/
-// @version      1.5.4
+// @version      1.5.5
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -2550,6 +2550,9 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
             try {
                 const db = await openIndexedDB();
                 let directoryData = await getDataFromIndexedDB(db);
+
+                        const lastUpdated = directoryData && directoryData.lastUpdated;
+        console.log('needsUpdate? ', needsUpdate(lastUpdated), lastUpdated);
 
                 if (!directoryData || needsUpdate(directoryData.lastUpdated)) {
                     directoryData = await fetchAndUpdateData(db);
