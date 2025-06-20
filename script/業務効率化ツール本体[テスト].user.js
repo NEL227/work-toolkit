@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体[テスト]
 // @namespace    http://tampermonkey.net/
-// @version      1.5.5
+// @version      1.5.6
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -2531,6 +2531,7 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
             || todayIsMonday;
         };
 
+
         const fetchAndUpdateData = async (db) => {
             try {
                 const response = await fetch('https://nel227.github.io/work-toolkit/directories.json');
@@ -2551,8 +2552,8 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                 const db = await openIndexedDB();
                 let directoryData = await getDataFromIndexedDB(db);
 
-                        const lastUpdated = directoryData && directoryData.lastUpdated;
-        console.log('needsUpdate? ', needsUpdate(lastUpdated), lastUpdated);
+                const lastUpdated = directoryData && directoryData.lastUpdated;
+                console.log('needsUpdate? ', needsUpdate(lastUpdated), lastUpdated);
 
                 if (!directoryData || needsUpdate(directoryData.lastUpdated)) {
                     directoryData = await fetchAndUpdateData(db);
