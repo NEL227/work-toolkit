@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体[テスト]
 // @namespace    http://tampermonkey.net/
-// @version      1.5.7
+// @version      1.5.8
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -597,13 +597,13 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
         const url = window.location.href;
         for (const page of pageScriptList) {
             if (page.urlPattern.test(url)) {
-                console.log(`[ページ検出] ${page.pageName}`);
+                // console.log(`[ページ検出] ${page.pageName}`);
                 page.scripts.forEach(script => {
                     if (script.isEnabled()) {
-                        console.log(`実行: ${script.name}`);
+                        // console.log(`実行: ${script.name}`);
                         script.run();
                     } else {
-                        console.log(`無効: ${script.name}`);
+                        // console.log(`無効: ${script.name}`);
                     }
                 });
                 break;
@@ -2491,7 +2491,6 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                 const request = objectStore.put({ id: 'directoryData', ...data });
 
                 request.onsuccess = () => {
-                    console.log('IndexedDB保存成功');
                     resolve();
                 };
                 request.onerror = (event) => {
@@ -2505,43 +2504,33 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
             });
         };
 
-const needsUpdate = (lastUpdated) => {
-    const now = Date.now();
-    let lastUpdatedDate;
-    if (typeof lastUpdated === "number") {
-        lastUpdatedDate = new Date(lastUpdated);
-    } else if (typeof lastUpdated === "string") {
-        lastUpdatedDate = new Date(lastUpdated.replace(/\//g, "-"));
-    } else {
-        return true;
-    }
-    if (isNaN(lastUpdatedDate.getTime())) return true;
+        const needsUpdate = (lastUpdated) => {
+            const now = Date.now();
+            let lastUpdatedDate;
+            if (typeof lastUpdated === "number") {
+                lastUpdatedDate = new Date(lastUpdated);
+            } else if (typeof lastUpdated === "string") {
+                lastUpdatedDate = new Date(lastUpdated.replace(/\//g, "-"));
+            } else {
+                return true;
+            }
+            if (isNaN(lastUpdatedDate.getTime())) return true;
 
-    const oneWeek = 7 * 24 * 60 * 60 * 1000;
-    const lastUpdateDay = lastUpdatedDate.getDay();
-    const currentDay = new Date().getDay();
+            const oneWeek = 7 * 24 * 60 * 60 * 1000;
+            const lastUpdateDay = lastUpdatedDate.getDay();
+            const currentDay = new Date().getDay();
 
-    // ★ここで値を出す！
-    console.log("now:", now);
-    console.log("lastUpdatedDate.getTime():", lastUpdatedDate.getTime());
-    console.log("now - lastUpdatedDate.getTime():", now - lastUpdatedDate.getTime());
-    console.log("oneWeek:", oneWeek);
-    console.log("一週間経過判定:", now - lastUpdatedDate.getTime() > oneWeek);
-    console.log("lastUpdateDay:", lastUpdateDay);
-    console.log("currentDay:", currentDay);
-
-    if (now - lastUpdatedDate.getTime() > oneWeek) return true;
-    if (lastUpdateDay !== 1 && currentDay === 1) return true;
-    return false;
-};
-
+            if (now - lastUpdatedDate.getTime() > oneWeek) return true;
+            if (lastUpdateDay !== 1 && currentDay === 1) return true;
+            return false;
+        };
 
         const fetchAndUpdateData = async (db) => {
             try {
                 const response = await fetch('https://nel227.github.io/work-toolkit/directories.json');
                 const data = await response.json();
 
-        const lastUpdated = Date.now();
+                const lastUpdated = Date.now();
 
                 await saveDataToIndexedDB(db, { data, lastUpdated });
                 return { data, lastUpdated };
@@ -2557,7 +2546,6 @@ const needsUpdate = (lastUpdated) => {
                 let directoryData = await getDataFromIndexedDB(db);
 
                 const lastUpdated = directoryData && directoryData.lastUpdated;
-                console.log('needsUpdate? ', needsUpdate(lastUpdated), lastUpdated);
 
                 if (!directoryData || needsUpdate(directoryData.lastUpdated)) {
                     directoryData = await fetchAndUpdateData(db);
@@ -8880,6 +8868,7 @@ transition: all 0.3s ease-in-out;
 
     function axisCodeErrorCheck(){
 
+        console.log("エラーチェック開始");
         let currentCode = '';
         let saveButton = null;
         let modalSaveButtons = [];
