@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体[テスト]
 // @namespace    http://tampermonkey.net/
-// @version      1.5.8
+// @version      1.5.12
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -698,13 +698,12 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
     }
 
     function enhanceTitleEditor() {
-
-        document.title += "/" + window.location.href.split('/').pop();
+        document.title += "/" + window.location.href.split("/").pop();
 
         const MAX_LENGTH = 255;
         let isEditingPopup = false;
 
-        const style = document.createElement('style');
+        const style = document.createElement("style");
         style.textContent = `
         .cursor-warning {
             color: red;
@@ -713,27 +712,29 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
 
         document.head.appendChild(style);
 
-        window.addEventListener('load', function() {
-            const targetTd = document.querySelector('td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"])');
+        function main() {
+            const targetTd = document.querySelector(
+                'td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"])'
+            );
             if (targetTd) {
                 const computedStyle = window.getComputedStyle(targetTd);
                 const paddingTop = computedStyle.paddingTop;
 
-                if (paddingTop === '7px') {
-                    targetTd.style.position = 'relative';
-                    targetTd.style.paddingTop = '30px';
+                if (paddingTop === "7px") {
+                    targetTd.style.position = "relative";
+                    targetTd.style.paddingTop = "30px";
                 }
             }
 
-            const inputFieldId = 'TbMainproductDaihyoSyohinName';
+            const inputFieldId = "TbMainproductDaihyoSyohinName";
             const inputField = document.getElementById(inputFieldId);
             if (!inputField) return;
 
-            const wrapperDiv = document.createElement('div');
-            wrapperDiv.style.position = 'relative';
+            const wrapperDiv = document.createElement("div");
+            wrapperDiv.style.position = "relative";
             inputField.parentNode.insertBefore(wrapperDiv, inputField);
             wrapperDiv.appendChild(inputField);
-            inputField.style.width = 'calc(100% - 60px)';
+            inputField.style.width = "calc(100% - 60px)";
 
             const popupStyle = `
             position: absolute;
@@ -750,26 +751,29 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
             width: calc(100% - 60px);
         `;
 
-            const popup = document.createElement('div');
-            popup.className = 'title-popup';
+            const popup = document.createElement("div");
+            popup.className = "title-popup";
             popup.style.cssText = popupStyle;
             popup.contentEditable = true;
             wrapperDiv.appendChild(popup);
 
             function syncPopupToInput() {
-                const updatedText = popup.textContent.replace(/\n/g, ' ');
+                const updatedText = popup.textContent.replace(/\n/g, " ");
                 inputField.value = updatedText;
                 updateButtonVisibility();
                 updateCursorPosition(true);
             }
 
             function updatePopup() {
-                if (inputField === document.activeElement && inputField.value.trim() !== '') {
+                if (
+                    inputField === document.activeElement &&
+                    inputField.value.trim() !== ""
+                ) {
                     popup.textContent = inputField.value;
-                    popup.style.display = 'block';
+                    popup.style.display = "block";
                     updatePopupText();
                 } else {
-                    popup.style.display = 'none';
+                    popup.style.display = "none";
                 }
             }
 
@@ -778,13 +782,16 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 popup.textContent = text;
             }
 
-            const popupElement = document.querySelector('#popup');
+            const popupElement = document.querySelector("#popup");
 
-            const observer = new MutationObserver(function(mutationsList) {
+            const observer = new MutationObserver(function (mutationsList) {
                 for (const mutation of mutationsList) {
-                    if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-                        if (popupElement.style.display === 'none') {
-                            popup.style.display = 'none';
+                    if (
+                        mutation.type === "attributes" &&
+                        mutation.attributeName === "style"
+                    ) {
+                        if (popupElement.style.display === "none") {
+                            popup.style.display = "none";
                         }
                     }
                 }
@@ -794,23 +801,28 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 observer.observe(popupElement, { attributes: true });
             }
 
-            document.addEventListener('click', function(event) {
-                if (popup.style.display === 'block' &&
+            document.addEventListener("click", function (event) {
+                if (
+                    popup.style.display === "block" &&
                     !popup.contains(event.target) &&
                     !inputField.contains(event.target) &&
-                    !event.target.closest('.suggest-popup')) {
+                    !event.target.closest(".suggest-popup")
+                ) {
                     const selection = window.getSelection();
                     if (selection.rangeCount > 0) {
                         const range = selection.getRangeAt(0);
                         const startContainer = range.startContainer;
                         const endContainer = range.endContainer;
 
-                        if (wrapperDiv.contains(startContainer) || wrapperDiv.contains(endContainer)) {
+                        if (
+                            wrapperDiv.contains(startContainer) ||
+                            wrapperDiv.contains(endContainer)
+                        ) {
                             return;
                         }
                     }
 
-                    popup.style.display = 'none';
+                    popup.style.display = "none";
                     inputField.blur();
                     updateButtonVisibility();
                     updateCursorPosition(false);
@@ -818,30 +830,34 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
             });
 
             const textObserver = new MutationObserver(() => {
-                const updatedText = popup.textContent.replace(/\n/g, ' ');
+                const updatedText = popup.textContent.replace(/\n/g, " ");
                 inputField.value = updatedText;
                 updateCursorPosition(true);
             });
 
             if (popup) {
-                textObserver.observe(popup, { childList: true, subtree: true, characterData: true });
+                textObserver.observe(popup, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true,
+                });
             }
 
-            popup.addEventListener('mouseup', () => {
+            popup.addEventListener("mouseup", () => {
                 updateCursorPosition(true);
             });
 
-            popup.addEventListener('focus', function() {
+            popup.addEventListener("focus", function () {
                 isEditingPopup = true;
                 updateCursorPosition(true);
             });
 
-            popup.addEventListener('blur', function() {
+            popup.addEventListener("blur", function () {
                 if (popup.textContent.length > MAX_LENGTH) {
                     alert(`入力可能な文字数を超えています。256字以降は切り捨てられます。`);
                 }
 
-                const updatedText = popup.textContent.replace(/\n/g, ' ');
+                const updatedText = popup.textContent.replace(/\n/g, " ");
                 popup.textContent = updatedText;
                 inputField.value = updatedText;
                 validatePopupInput();
@@ -849,16 +865,16 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 updateCursorPosition(false);
             });
 
-            popup.addEventListener('keydown', function (event) {
+            popup.addEventListener("keydown", function (event) {
                 const selection = window.getSelection();
                 const range = selection.getRangeAt(0);
                 const cursorOffset = range.startOffset;
 
-                if (event.key === 'Enter') {
+                if (event.key === "Enter") {
                     const beforeCursor = popup.textContent.slice(0, cursorOffset);
                     const afterCursor = popup.textContent.slice(cursorOffset);
 
-                    popup.textContent = beforeCursor + ' ' + afterCursor;
+                    popup.textContent = beforeCursor + " " + afterCursor;
 
                     const newRange = document.createRange();
                     const firstChild = popup.firstChild;
@@ -872,7 +888,10 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                         selection.addRange(newRange);
 
                         setTimeout(() => {
-                            updateCursorPosition(document.activeElement === popup, newCursorPosition);
+                            updateCursorPosition(
+                                document.activeElement === popup,
+                                newCursorPosition
+                            );
                         }, 0);
                     }
 
@@ -886,11 +905,11 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 }
             });
 
-            popup.addEventListener('paste', function (event) {
+            popup.addEventListener("paste", function (event) {
                 event.preventDefault();
 
                 const clipboardData = event.clipboardData || window.clipboardData;
-                const pasteText = clipboardData.getData('text/plain');
+                const pasteText = clipboardData.getData("text/plain");
 
                 const selection = window.getSelection();
                 const range = selection.getRangeAt(0);
@@ -901,7 +920,7 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 const beforeCursor = popup.textContent.slice(0, cursorOffset);
                 const afterCursor = popup.textContent.slice(cursorOffset);
 
-                const updatedPasteText = pasteText.replace(/\n/g, ' ');
+                const updatedPasteText = pasteText.replace(/\n/g, " ");
 
                 popup.textContent = beforeCursor + updatedPasteText + afterCursor;
 
@@ -920,7 +939,7 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 updateCursorPosition(true);
             });
 
-            popup.addEventListener('input', () => {
+            popup.addEventListener("input", () => {
                 const selection = window.getSelection();
                 const range = selection.getRangeAt(0);
                 const startOffset = range.startOffset;
@@ -928,7 +947,7 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
 
                 const text = popup.textContent;
 
-                const updatedText = text.replace(/\n/g, ' ');
+                const updatedText = text.replace(/\n/g, " ");
                 inputField.value = updatedText;
 
                 updateButtonVisibility();
@@ -943,10 +962,10 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
 
             let lastCursorPosition = null;
 
-            const suggestPopupElements = document.querySelectorAll('.suggest-popup');
+            const suggestPopupElements = document.querySelectorAll(".suggest-popup");
 
-            suggestPopupElements.forEach(suggestPopup => {
-                suggestPopup.addEventListener('mousedown', (e) => {
+            suggestPopupElements.forEach((suggestPopup) => {
+                suggestPopup.addEventListener("mousedown", (e) => {
                     if (!isEditingPopup) return;
                     e.preventDefault();
 
@@ -960,9 +979,9 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                     }
                 });
 
-                suggestPopup.addEventListener('click', (e) => {
+                suggestPopup.addEventListener("click", (e) => {
                     if (!isEditingPopup) return;
-                    if (e.target.classList.contains('add-word-button')) return;
+                    if (e.target.classList.contains("add-word-button")) return;
 
                     if (lastCursorPosition) {
                         const selection = window.getSelection();
@@ -999,98 +1018,97 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 return offset;
             }
 
-            const spaceFixButton = createButton('スペース修正');
-            const removeDuplicatesButton = createButton('重複削除');
+            const spaceFixButton = createButton("スペース修正");
+            const removeDuplicatesButton = createButton("重複削除");
             const cursorPosition = createCursorPosition();
             wrapperDiv.appendChild(cursorPosition);
 
             addHighlightStyles();
 
             if (isRegisteredEditPage()) {
-                const buttonContainer = document.createElement('div');
-                buttonContainer.style.position = 'absolute';
-                buttonContainer.style.top = '-29px';
-                buttonContainer.style.right = '55px';
-                buttonContainer.style.display = 'flex';
-                buttonContainer.style.flexDirection = 'row';
-                buttonContainer.style.gap = '10px';
-                buttonContainer.style.zIndex = '1000';
+                const buttonContainer = document.createElement("div");
+                buttonContainer.style.position = "absolute";
+                buttonContainer.style.top = "-29px";
+                buttonContainer.style.right = "55px";
+                buttonContainer.style.display = "flex";
+                buttonContainer.style.flexDirection = "row";
+                buttonContainer.style.gap = "10px";
+                buttonContainer.style.zIndex = "1000";
 
-                inputField.parentNode.style.position = 'relative';
+                inputField.parentNode.style.position = "relative";
                 inputField.parentNode.appendChild(buttonContainer);
 
                 setButtonStyles(removeDuplicatesButton, {
-                    backgroundColor: 'transparent',
-                    color: '#000000',
-                    border: '1px solid #ccc',
-                    padding: '0px 7px',
-                    marginLeft: '5px',
-                    marginTop: '4px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    visibility: 'hidden',
-                    transition: 'background-color 0.3s, transform 0.1s',
+                    backgroundColor: "transparent",
+                    color: "#000000",
+                    border: "1px solid #ccc",
+                    padding: "0px 7px",
+                    marginLeft: "5px",
+                    marginTop: "4px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    visibility: "hidden",
+                    transition: "background-color 0.3s, transform 0.1s",
                 });
 
                 setButtonStyles(spaceFixButton, {
-                    backgroundColor: 'transparent',
-                    color: '#000000',
-                    border: '1px solid #ccc',
-                    padding: '0px 7px',
-                    marginLeft: '5px',
-                    marginTop: '4px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    visibility: 'hidden',
-                    transition: 'background-color 0.3s, transform 0.1s',
+                    backgroundColor: "transparent",
+                    color: "#000000",
+                    border: "1px solid #ccc",
+                    padding: "0px 7px",
+                    marginLeft: "5px",
+                    marginTop: "4px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    visibility: "hidden",
+                    transition: "background-color 0.3s, transform 0.1s",
                 });
 
                 buttonContainer.appendChild(spaceFixButton);
                 buttonContainer.appendChild(removeDuplicatesButton);
 
                 updateButtonVisibility();
-
             } else if (isMainEditPage()) {
-                const buttonContainer = document.createElement('div');
-                buttonContainer.style.position = 'absolute';
-                buttonContainer.style.top = '-29px';
-                buttonContainer.style.right = '55px';
-                buttonContainer.style.display = 'flex';
-                buttonContainer.style.flexDirection = 'row';
-                buttonContainer.style.gap = '10px';
-                buttonContainer.style.zIndex = '1000';
+                const buttonContainer = document.createElement("div");
+                buttonContainer.style.position = "absolute";
+                buttonContainer.style.top = "-29px";
+                buttonContainer.style.right = "55px";
+                buttonContainer.style.display = "flex";
+                buttonContainer.style.flexDirection = "row";
+                buttonContainer.style.gap = "10px";
+                buttonContainer.style.zIndex = "1000";
 
-                inputField.parentNode.style.position = 'relative';
+                inputField.parentNode.style.position = "relative";
                 inputField.parentNode.appendChild(buttonContainer);
 
                 setButtonStyles(removeDuplicatesButton, {
-                    backgroundColor: 'transparent',
-                    color: '#000000',
-                    border: '1px solid #ccc',
-                    padding: '0px 7px',
-                    marginLeft: '5px',
-                    marginTop: '4px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    visibility: 'hidden',
-                    transition: 'background-color 0.3s, transform 0.1s',
+                    backgroundColor: "transparent",
+                    color: "#000000",
+                    border: "1px solid #ccc",
+                    padding: "0px 7px",
+                    marginLeft: "5px",
+                    marginTop: "4px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    visibility: "hidden",
+                    transition: "background-color 0.3s, transform 0.1s",
                 });
 
                 setButtonStyles(spaceFixButton, {
-                    backgroundColor: 'transparent',
-                    color: '#000000',
-                    border: '1px solid #ccc',
-                    padding: '0px 7px',
-                    marginLeft: '5px',
-                    marginTop: '4px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    visibility: 'hidden',
-                    transition: 'background-color 0.3s, transform 0.1s',
+                    backgroundColor: "transparent",
+                    color: "#000000",
+                    border: "1px solid #ccc",
+                    padding: "0px 7px",
+                    marginLeft: "5px",
+                    marginTop: "4px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    visibility: "hidden",
+                    transition: "background-color 0.3s, transform 0.1s",
                 });
 
                 buttonContainer.appendChild(spaceFixButton);
@@ -1099,60 +1117,60 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 updateButtonVisibility();
             }
 
-            inputField.addEventListener('blur', function() {
+            inputField.addEventListener("blur", function () {
                 updateCursorPosition(false);
             });
-            inputField.addEventListener('focus', function() {
+            inputField.addEventListener("focus", function () {
                 updatePopup();
                 updateCursorPosition(true);
             });
-            inputField.addEventListener('input', function() {
+            inputField.addEventListener("input", function () {
                 updatePopup();
             });
 
-            inputField.addEventListener('keyup', function() {
+            inputField.addEventListener("keyup", function () {
                 updateCursorPosition(true);
             });
-            inputField.addEventListener('click', function() {
+            inputField.addEventListener("click", function () {
                 updateCursorPosition(true);
             });
 
-            spaceFixButton.addEventListener('click', function(event) {
+            spaceFixButton.addEventListener("click", function (event) {
                 event.preventDefault();
                 event.stopPropagation();
                 handleSpaceFixClick(inputField, spaceFixButton);
                 addClickFeedback(spaceFixButton);
             });
 
-            removeDuplicatesButton.addEventListener('click', function(event) {
+            removeDuplicatesButton.addEventListener("click", function (event) {
                 event.preventDefault();
                 event.stopPropagation();
                 handleRemoveDuplicatesClick(inputField, removeDuplicatesButton);
                 addClickFeedback(removeDuplicatesButton);
             });
 
-            removeDuplicatesButton.addEventListener('mouseover', function() {
+            removeDuplicatesButton.addEventListener("mouseover", function () {
                 const duplicates = getDuplicateWords(inputField.value);
                 if (duplicates.length > 0) {
-                    removeDuplicatesButton.title = `重複ワード: ${duplicates.join(', ')}`;
+                    removeDuplicatesButton.title = `重複ワード: ${duplicates.join(", ")}`;
                 } else {
-                    removeDuplicatesButton.title = '';
+                    removeDuplicatesButton.title = "";
                 }
             });
 
             function addClickFeedback(button) {
-                button.style.transform = 'scale(0.9)';
+                button.style.transform = "scale(0.9)";
                 setTimeout(() => {
-                    button.style.transform = 'scale(1)';
+                    button.style.transform = "scale(1)";
                 }, 100);
             }
 
             function attachContainerToElement(container, selector) {
                 const targetButton = document.querySelector(selector);
                 if (targetButton) {
-                    const wrapper = document.createElement('div');
-                    wrapper.style.display = 'inline-flex';
-                    wrapper.style.alignItems = 'flex-end';
+                    const wrapper = document.createElement("div");
+                    wrapper.style.display = "inline-flex";
+                    wrapper.style.alignItems = "flex-end";
 
                     targetButton.parentNode.insertBefore(wrapper, targetButton.nextSibling);
                     wrapper.appendChild(targetButton);
@@ -1161,21 +1179,21 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
             }
 
             function createButton(textContent) {
-                const btn = document.createElement('button');
+                const btn = document.createElement("button");
                 btn.textContent = textContent;
                 return btn;
             }
 
             function createCursorPosition() {
-                const span = document.createElement('span');
-                span.style.marginLeft = '3px';
-                span.style.fontSize = '11px';
-                span.style.verticalAlign = 'middle';
+                const span = document.createElement("span");
+                span.style.marginLeft = "3px";
+                span.style.fontSize = "11px";
+                span.style.verticalAlign = "middle";
                 return span;
             }
 
             function addHighlightStyles() {
-                const style = document.createElement('style');
+                const style = document.createElement("style");
                 style.innerHTML = `
                 .highlight {
                     border: 2px solid #ff0000;
@@ -1186,30 +1204,38 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
             }
 
             function isRegisteredEditPage() {
-                return window.location.href.includes('/forests/TbMainproducts/registered_mainedit/') ||
-                    window.location.href.includes('/forests/tb_mainproducts/registered_mainedit/');
+                return (
+                    window.location.href.includes(
+                        "/forests/TbMainproducts/registered_mainedit/"
+                    ) ||
+                    window.location.href.includes(
+                        "/forests/tb_mainproducts/registered_mainedit/"
+                    )
+                );
             }
 
             function isMainEditPage() {
-                return window.location.href.includes('/forests/TbMainproducts/mainedit/') ||
-                    window.location.href.includes('/forests/tb_mainproducts/mainedit/');
+                return (
+                    window.location.href.includes("/forests/TbMainproducts/mainedit/") ||
+                    window.location.href.includes("/forests/tb_mainproducts/mainedit/")
+                );
             }
 
             function setButtonStyles(button, styles) {
                 Object.assign(button.style, styles);
 
-                button.addEventListener('mouseover', function() {
-                    button.style.backgroundColor = '#f0f0f0';
+                button.addEventListener("mouseover", function () {
+                    button.style.backgroundColor = "#f0f0f0";
                 });
-                button.addEventListener('mouseout', function() {
-                    button.style.backgroundColor = 'transparent';
+                button.addEventListener("mouseout", function () {
+                    button.style.backgroundColor = "transparent";
                 });
 
-                button.addEventListener('mousedown', function() {
-                    button.style.transform = 'scale(0.95)';
+                button.addEventListener("mousedown", function () {
+                    button.style.transform = "scale(0.95)";
                 });
-                button.addEventListener('mouseup', function() {
-                    button.style.transform = 'scale(1)';
+                button.addEventListener("mouseup", function () {
+                    button.style.transform = "scale(1)";
                 });
             }
 
@@ -1221,15 +1247,24 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 }
             }
 
-            function attachButtonToElementInTd(button, tagName, includeText1, includeText2, callback) {
-                const parentTd = inputField.closest('td');
+            function attachButtonToElementInTd(
+            button,
+             tagName,
+             includeText1,
+             includeText2,
+             callback
+            ) {
+                const parentTd = inputField.closest("td");
                 if (!parentTd) {
                     return;
                 }
 
                 const targetElements = parentTd.getElementsByTagName(tagName);
                 for (let i = 0; i < targetElements.length; i++) {
-                    if (targetElements[i].innerHTML.includes(includeText1) && targetElements[i].innerHTML.includes(includeText2)) {
+                    if (
+                        targetElements[i].innerHTML.includes(includeText1) &&
+                        targetElements[i].innerHTML.includes(includeText2)
+                    ) {
                         targetElements[i].appendChild(button);
                         callback();
                         return;
@@ -1246,25 +1281,28 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                     totalLength = inputField.value.length;
                 } else if (focused && popup === document.activeElement) {
                     const selection = window.getSelection();
-                    position = customPosition !== null ? customPosition : selection.anchorOffset;
+                    position =
+                        customPosition !== null ? customPosition : selection.anchorOffset;
                     totalLength = popup.textContent.length;
                 } else {
                     position = 0;
                     totalLength = inputField.value.length;
                 }
 
-                cursorPosition.textContent = focused ? `${position}/${totalLength}` : `${totalLength}`;
+                cursorPosition.textContent = focused
+                    ? `${position}/${totalLength}`
+        : `${totalLength}`;
 
                 if (totalLength > MAX_LENGTH) {
-                    cursorPosition.classList.add('cursor-warning');
+                    cursorPosition.classList.add("cursor-warning");
                 } else {
-                    cursorPosition.classList.remove('cursor-warning');
+                    cursorPosition.classList.remove("cursor-warning");
                 }
             }
 
             function validatePopupInput() {
                 let currentText = popup.textContent;
-                currentText = currentText.replace(/\n/g, ' ');
+                currentText = currentText.replace(/\n/g, " ");
                 if (currentText.length > MAX_LENGTH) {
                     currentText = currentText.substring(0, MAX_LENGTH);
                     popup.textContent = currentText;
@@ -1282,19 +1320,19 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 const hasDuplicates = hasDuplicateWords(value);
 
                 if (hasSpaceIssues) {
-                    spaceFixButton.style.visibility = 'visible';
-                    inputField.classList.add('highlight');
+                    spaceFixButton.style.visibility = "visible";
+                    inputField.classList.add("highlight");
                 } else {
-                    spaceFixButton.style.visibility = 'hidden';
+                    spaceFixButton.style.visibility = "hidden";
                 }
 
                 if (hasDuplicates) {
-                    removeDuplicatesButton.style.visibility = 'visible';
-                    inputField.classList.add('highlight');
+                    removeDuplicatesButton.style.visibility = "visible";
+                    inputField.classList.add("highlight");
                 } else {
-                    removeDuplicatesButton.style.visibility = 'hidden';
+                    removeDuplicatesButton.style.visibility = "hidden";
                     if (!hasSpaceIssues) {
-                        inputField.classList.remove('highlight');
+                        inputField.classList.remove("highlight");
                     }
                 }
 
@@ -1303,10 +1341,10 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
 
             function handleSpaceFixClick(inputField, button) {
                 const trimmedValue = inputField.value.trim();
-                let processedValue = trimmedValue.replace(/\s{2,}/g, ' ');
-                processedValue = processedValue.replace(/　/g, ' ');
+                let processedValue = trimmedValue.replace(/\s{2,}/g, " ");
+                processedValue = processedValue.replace(/　/g, " ");
                 inputField.value = processedValue;
-                button.style.visibility = 'hidden';
+                button.style.visibility = "hidden";
                 updateButtonVisibility();
                 updatePopupContent();
                 updateCursorPosition(document.activeElement === inputField);
@@ -1321,31 +1359,31 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 const value = inputField.value;
                 const words = value.split(/\s+/);
                 const uniqueWords = [...new Set(words)];
-                const processedValue = uniqueWords.join(' ');
+                const processedValue = uniqueWords.join(" ");
                 if (value !== processedValue) {
                     inputField.value = processedValue;
-                    inputField.classList.add('highlight');
+                    inputField.classList.add("highlight");
                     updatePopupContent();
                 } else {
-                    inputField.classList.remove('highlight');
+                    inputField.classList.remove("highlight");
                 }
-                button.style.visibility = 'hidden';
+                button.style.visibility = "hidden";
                 updateButtonVisibility();
                 updateCursorPosition(document.activeElement === inputField);
             }
 
             function hasDuplicateWords(value) {
-                const words = value.split(/\s+/).filter(word => word.trim() !== '');
+                const words = value.split(/\s+/).filter((word) => word.trim() !== "");
                 const uniqueWords = new Set(words);
                 return uniqueWords.size < words.length;
             }
 
             function getDuplicateWords(value) {
-                const words = value.split(/\s+/).filter(word => word.trim() !== '');
+                const words = value.split(/\s+/).filter((word) => word.trim() !== "");
                 const wordCount = {};
                 const duplicates = [];
 
-                words.forEach(word => {
+                words.forEach((word) => {
                     wordCount[word] = (wordCount[word] || 0) + 1;
                 });
 
@@ -1357,7 +1395,12 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
 
                 return duplicates;
             }
-        });
+        }
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", main);
+        } else {
+            main();
+        }
     }
 
     async function titleInputHelper() {
@@ -2142,7 +2185,7 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                     subtree: true
                 });
 
-                window.addEventListener('load', () => {
+                function mainPopupInit() {
                     addShowSubwordsButton();
 
                     const savedWidth = localStorage.getItem('popupWidth');
@@ -2158,9 +2201,14 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                         }
                     }
 
-                    fetchJSON(data => {
-                    });
-                });
+                    fetchJSON(data => {});
+                }
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', mainPopupInit);
+                } else {
+                    mainPopupInit();
+                }
 
                 //送信機能
                 const API_URL = 'https://work-toolkit.vercel.app/api/github-proxy';
@@ -3570,13 +3618,19 @@ transition: all 0.3s ease-in-out;
             }
         }
 
-        window.addEventListener('load', function () {
+        function mainShipping() {
             openDatabase().then(() => {
                 initialize();
             }).catch(error => {
                 console.error(error);
             });
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', mainShipping);
+        } else {
+            mainShipping();
+        }
     }
 
     function enhanceRemarksEditor(){
@@ -3621,7 +3675,7 @@ transition: all 0.3s ease-in-out;
     `;
         document.head.appendChild(style);
 
-        window.addEventListener('load', function() {
+        function main() {
             const remarksHeader = [...document.querySelectorAll('th[scope="row"]')].find(th => th.textContent.includes("備考"));
 
             if (remarksHeader) {
@@ -3897,7 +3951,13 @@ transition: all 0.3s ease-in-out;
                     inputField.blur();
                 }
             });
-        });
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function presetTextHelper(){
@@ -4204,7 +4264,7 @@ transition: all 0.3s ease-in-out;
             templateListDiv.style.width = `${Math.min(maxWidthNeeded, maxWidth)}px`;
         }
 
-        window.addEventListener('load', (event) => {
+        function main() {
             const sizeTemplates = [
                 { shortText: '【サイズ表提示】', fullText: '画像をご参照ください。' },
                 { shortText: '【メンズインナー】', fullText: '商品のタグ表記や在庫表は海外サイズとなっておりますが、\n在庫表の【】内が一般的な日本サイズでございます。' },
@@ -4238,7 +4298,13 @@ transition: all 0.3s ease-in-out;
             addTemplateButton('TbMainproduct補足説明PC', supplementTemplates);
 
             adjustTemplateListSize();
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function autoInsertColor(){
@@ -8868,7 +8934,6 @@ transition: all 0.3s ease-in-out;
 
     function axisCodeErrorCheck(){
 
-        console.log("エラーチェック開始");
         let currentCode = '';
         let saveButton = null;
         let modalSaveButtons = [];
@@ -9175,11 +9240,8 @@ transition: all 0.3s ease-in-out;
                 attributeFilter: ['style']
             });
         }
-
-        window.addEventListener('load', () => {
-            highlightInputs();
-            observeDynamicElements();
-        });
+        highlightInputs();
+        observeDynamicElements();
     }
 
     function autoReplaceAxisCode(){
@@ -11909,4 +11971,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: 18449d2cd7d2e6ae0f82883e933eb69a8c79d20640d2ac5907329b15c3825b83
+// @integrity-hash: df820e145648efc97573e70887ed3647cda7c03835bca5f5e90e3c4eefa58d10
