@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.5.5
+// @version      1.6.0
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -29,6 +29,7 @@
         "orderStatusCheck", "bulkOrderCheck", "axisReminder", "nonColorSizeReminder",
         "axisCodeErrorCheck", "autoReplaceAxisCode","denpyoUpdateGuard","applyTagStyle","denpyoAutoReflect",
         "jyuchuDateCheck", "freeStockCheck", "autoLogin", "denpyoBunkatsuAutoReflect", "doukonCheck",
+        "deliveryNoteTemplateSupport",
     ];
 
     const settings = {};
@@ -176,6 +177,7 @@ ${createCheckboxAndDetails('freeStockCheck', 'フリー在庫数チェック', '
 ${createCheckboxAndDetails('autoLogin', '自動ログイン', '楽天系モールへの自動ログイン<br>前提条件としてWebsystemへのログインと楽天IDとパスワードへの事前入力が必須<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.03.00" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
 ${createCheckboxAndDetails('denpyoBunkatsuAutoReflect', '分割伝票処理自動化', '伝票分割時に元伝票・分割先に伝票番号を作業用欄へ自動反映<br>入荷待ちタグの挿入と確認チェックの自動化<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.4.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
 ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受注画面で同梱可否を自動判定し、実行操作をサポート<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.5.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
+${createCheckboxAndDetails('deliveryNoteTemplateSupport', '納品書特記事項 定型文入力補助', '納品書特記事項の横に「定型文」ボタンを追加<br>クリックで定型文の一覧を表示<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.6.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
                 </div>
               </details>
             </section>
@@ -547,6 +549,11 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                     isEnabled: () => settings.doukonCheck,
                     run: doukonCheck,
                 },
+                {
+                    name: '納品書特記事項 定型文入力補助',
+                    isEnabled: () => settings.deliveryNoteTemplateSupport,
+                    run: deliveryNoteTemplateSupport,
+                },
             ],
         },
         {
@@ -700,13 +707,12 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
     }
 
     function enhanceTitleEditor() {
-
-        document.title += "/" + window.location.href.split('/').pop();
+        document.title += "/" + window.location.href.split("/").pop();
 
         const MAX_LENGTH = 255;
         let isEditingPopup = false;
 
-        const style = document.createElement('style');
+        const style = document.createElement("style");
         style.textContent = `
         .cursor-warning {
             color: red;
@@ -715,27 +721,29 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
 
         document.head.appendChild(style);
 
-        window.addEventListener('load', function() {
-            const targetTd = document.querySelector('td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"])');
+        function main() {
+            const targetTd = document.querySelector(
+                'td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"])'
+            );
             if (targetTd) {
                 const computedStyle = window.getComputedStyle(targetTd);
                 const paddingTop = computedStyle.paddingTop;
 
-                if (paddingTop === '7px') {
-                    targetTd.style.position = 'relative';
-                    targetTd.style.paddingTop = '30px';
+                if (paddingTop === "7px") {
+                    targetTd.style.position = "relative";
+                    targetTd.style.paddingTop = "30px";
                 }
             }
 
-            const inputFieldId = 'TbMainproductDaihyoSyohinName';
+            const inputFieldId = "TbMainproductDaihyoSyohinName";
             const inputField = document.getElementById(inputFieldId);
             if (!inputField) return;
 
-            const wrapperDiv = document.createElement('div');
-            wrapperDiv.style.position = 'relative';
+            const wrapperDiv = document.createElement("div");
+            wrapperDiv.style.position = "relative";
             inputField.parentNode.insertBefore(wrapperDiv, inputField);
             wrapperDiv.appendChild(inputField);
-            inputField.style.width = 'calc(100% - 60px)';
+            inputField.style.width = "calc(100% - 60px)";
 
             const popupStyle = `
             position: absolute;
@@ -752,26 +760,29 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
             width: calc(100% - 60px);
         `;
 
-            const popup = document.createElement('div');
-            popup.className = 'title-popup';
+            const popup = document.createElement("div");
+            popup.className = "title-popup";
             popup.style.cssText = popupStyle;
             popup.contentEditable = true;
             wrapperDiv.appendChild(popup);
 
             function syncPopupToInput() {
-                const updatedText = popup.textContent.replace(/\n/g, ' ');
+                const updatedText = popup.textContent.replace(/\n/g, " ");
                 inputField.value = updatedText;
                 updateButtonVisibility();
                 updateCursorPosition(true);
             }
 
             function updatePopup() {
-                if (inputField === document.activeElement && inputField.value.trim() !== '') {
+                if (
+                    inputField === document.activeElement &&
+                    inputField.value.trim() !== ""
+                ) {
                     popup.textContent = inputField.value;
-                    popup.style.display = 'block';
+                    popup.style.display = "block";
                     updatePopupText();
                 } else {
-                    popup.style.display = 'none';
+                    popup.style.display = "none";
                 }
             }
 
@@ -780,13 +791,16 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 popup.textContent = text;
             }
 
-            const popupElement = document.querySelector('#popup');
+            const popupElement = document.querySelector("#popup");
 
-            const observer = new MutationObserver(function(mutationsList) {
+            const observer = new MutationObserver(function (mutationsList) {
                 for (const mutation of mutationsList) {
-                    if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-                        if (popupElement.style.display === 'none') {
-                            popup.style.display = 'none';
+                    if (
+                        mutation.type === "attributes" &&
+                        mutation.attributeName === "style"
+                    ) {
+                        if (popupElement.style.display === "none") {
+                            popup.style.display = "none";
                         }
                     }
                 }
@@ -796,23 +810,28 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 observer.observe(popupElement, { attributes: true });
             }
 
-            document.addEventListener('click', function(event) {
-                if (popup.style.display === 'block' &&
+            document.addEventListener("click", function (event) {
+                if (
+                    popup.style.display === "block" &&
                     !popup.contains(event.target) &&
                     !inputField.contains(event.target) &&
-                    !event.target.closest('.suggest-popup')) {
+                    !event.target.closest(".suggest-popup")
+                ) {
                     const selection = window.getSelection();
                     if (selection.rangeCount > 0) {
                         const range = selection.getRangeAt(0);
                         const startContainer = range.startContainer;
                         const endContainer = range.endContainer;
 
-                        if (wrapperDiv.contains(startContainer) || wrapperDiv.contains(endContainer)) {
+                        if (
+                            wrapperDiv.contains(startContainer) ||
+                            wrapperDiv.contains(endContainer)
+                        ) {
                             return;
                         }
                     }
 
-                    popup.style.display = 'none';
+                    popup.style.display = "none";
                     inputField.blur();
                     updateButtonVisibility();
                     updateCursorPosition(false);
@@ -820,30 +839,34 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
             });
 
             const textObserver = new MutationObserver(() => {
-                const updatedText = popup.textContent.replace(/\n/g, ' ');
+                const updatedText = popup.textContent.replace(/\n/g, " ");
                 inputField.value = updatedText;
                 updateCursorPosition(true);
             });
 
             if (popup) {
-                textObserver.observe(popup, { childList: true, subtree: true, characterData: true });
+                textObserver.observe(popup, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true,
+                });
             }
 
-            popup.addEventListener('mouseup', () => {
+            popup.addEventListener("mouseup", () => {
                 updateCursorPosition(true);
             });
 
-            popup.addEventListener('focus', function() {
+            popup.addEventListener("focus", function () {
                 isEditingPopup = true;
                 updateCursorPosition(true);
             });
 
-            popup.addEventListener('blur', function() {
+            popup.addEventListener("blur", function () {
                 if (popup.textContent.length > MAX_LENGTH) {
                     alert(`入力可能な文字数を超えています。256字以降は切り捨てられます。`);
                 }
 
-                const updatedText = popup.textContent.replace(/\n/g, ' ');
+                const updatedText = popup.textContent.replace(/\n/g, " ");
                 popup.textContent = updatedText;
                 inputField.value = updatedText;
                 validatePopupInput();
@@ -851,16 +874,16 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 updateCursorPosition(false);
             });
 
-            popup.addEventListener('keydown', function (event) {
+            popup.addEventListener("keydown", function (event) {
                 const selection = window.getSelection();
                 const range = selection.getRangeAt(0);
                 const cursorOffset = range.startOffset;
 
-                if (event.key === 'Enter') {
+                if (event.key === "Enter") {
                     const beforeCursor = popup.textContent.slice(0, cursorOffset);
                     const afterCursor = popup.textContent.slice(cursorOffset);
 
-                    popup.textContent = beforeCursor + ' ' + afterCursor;
+                    popup.textContent = beforeCursor + " " + afterCursor;
 
                     const newRange = document.createRange();
                     const firstChild = popup.firstChild;
@@ -874,7 +897,10 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                         selection.addRange(newRange);
 
                         setTimeout(() => {
-                            updateCursorPosition(document.activeElement === popup, newCursorPosition);
+                            updateCursorPosition(
+                                document.activeElement === popup,
+                                newCursorPosition
+                            );
                         }, 0);
                     }
 
@@ -888,11 +914,11 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 }
             });
 
-            popup.addEventListener('paste', function (event) {
+            popup.addEventListener("paste", function (event) {
                 event.preventDefault();
 
                 const clipboardData = event.clipboardData || window.clipboardData;
-                const pasteText = clipboardData.getData('text/plain');
+                const pasteText = clipboardData.getData("text/plain");
 
                 const selection = window.getSelection();
                 const range = selection.getRangeAt(0);
@@ -903,7 +929,7 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 const beforeCursor = popup.textContent.slice(0, cursorOffset);
                 const afterCursor = popup.textContent.slice(cursorOffset);
 
-                const updatedPasteText = pasteText.replace(/\n/g, ' ');
+                const updatedPasteText = pasteText.replace(/\n/g, " ");
 
                 popup.textContent = beforeCursor + updatedPasteText + afterCursor;
 
@@ -922,7 +948,7 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 updateCursorPosition(true);
             });
 
-            popup.addEventListener('input', () => {
+            popup.addEventListener("input", () => {
                 const selection = window.getSelection();
                 const range = selection.getRangeAt(0);
                 const startOffset = range.startOffset;
@@ -930,7 +956,7 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
 
                 const text = popup.textContent;
 
-                const updatedText = text.replace(/\n/g, ' ');
+                const updatedText = text.replace(/\n/g, " ");
                 inputField.value = updatedText;
 
                 updateButtonVisibility();
@@ -945,10 +971,10 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
 
             let lastCursorPosition = null;
 
-            const suggestPopupElements = document.querySelectorAll('.suggest-popup');
+            const suggestPopupElements = document.querySelectorAll(".suggest-popup");
 
-            suggestPopupElements.forEach(suggestPopup => {
-                suggestPopup.addEventListener('mousedown', (e) => {
+            suggestPopupElements.forEach((suggestPopup) => {
+                suggestPopup.addEventListener("mousedown", (e) => {
                     if (!isEditingPopup) return;
                     e.preventDefault();
 
@@ -962,9 +988,9 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                     }
                 });
 
-                suggestPopup.addEventListener('click', (e) => {
+                suggestPopup.addEventListener("click", (e) => {
                     if (!isEditingPopup) return;
-                    if (e.target.classList.contains('add-word-button')) return;
+                    if (e.target.classList.contains("add-word-button")) return;
 
                     if (lastCursorPosition) {
                         const selection = window.getSelection();
@@ -1001,98 +1027,97 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 return offset;
             }
 
-            const spaceFixButton = createButton('スペース修正');
-            const removeDuplicatesButton = createButton('重複削除');
+            const spaceFixButton = createButton("スペース修正");
+            const removeDuplicatesButton = createButton("重複削除");
             const cursorPosition = createCursorPosition();
             wrapperDiv.appendChild(cursorPosition);
 
             addHighlightStyles();
 
             if (isRegisteredEditPage()) {
-                const buttonContainer = document.createElement('div');
-                buttonContainer.style.position = 'absolute';
-                buttonContainer.style.top = '-29px';
-                buttonContainer.style.right = '55px';
-                buttonContainer.style.display = 'flex';
-                buttonContainer.style.flexDirection = 'row';
-                buttonContainer.style.gap = '10px';
-                buttonContainer.style.zIndex = '1000';
+                const buttonContainer = document.createElement("div");
+                buttonContainer.style.position = "absolute";
+                buttonContainer.style.top = "-29px";
+                buttonContainer.style.right = "55px";
+                buttonContainer.style.display = "flex";
+                buttonContainer.style.flexDirection = "row";
+                buttonContainer.style.gap = "10px";
+                buttonContainer.style.zIndex = "1000";
 
-                inputField.parentNode.style.position = 'relative';
+                inputField.parentNode.style.position = "relative";
                 inputField.parentNode.appendChild(buttonContainer);
 
                 setButtonStyles(removeDuplicatesButton, {
-                    backgroundColor: 'transparent',
-                    color: '#000000',
-                    border: '1px solid #ccc',
-                    padding: '0px 7px',
-                    marginLeft: '5px',
-                    marginTop: '4px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    visibility: 'hidden',
-                    transition: 'background-color 0.3s, transform 0.1s',
+                    backgroundColor: "transparent",
+                    color: "#000000",
+                    border: "1px solid #ccc",
+                    padding: "0px 7px",
+                    marginLeft: "5px",
+                    marginTop: "4px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    visibility: "hidden",
+                    transition: "background-color 0.3s, transform 0.1s",
                 });
 
                 setButtonStyles(spaceFixButton, {
-                    backgroundColor: 'transparent',
-                    color: '#000000',
-                    border: '1px solid #ccc',
-                    padding: '0px 7px',
-                    marginLeft: '5px',
-                    marginTop: '4px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    visibility: 'hidden',
-                    transition: 'background-color 0.3s, transform 0.1s',
+                    backgroundColor: "transparent",
+                    color: "#000000",
+                    border: "1px solid #ccc",
+                    padding: "0px 7px",
+                    marginLeft: "5px",
+                    marginTop: "4px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    visibility: "hidden",
+                    transition: "background-color 0.3s, transform 0.1s",
                 });
 
                 buttonContainer.appendChild(spaceFixButton);
                 buttonContainer.appendChild(removeDuplicatesButton);
 
                 updateButtonVisibility();
-
             } else if (isMainEditPage()) {
-                const buttonContainer = document.createElement('div');
-                buttonContainer.style.position = 'absolute';
-                buttonContainer.style.top = '-29px';
-                buttonContainer.style.right = '55px';
-                buttonContainer.style.display = 'flex';
-                buttonContainer.style.flexDirection = 'row';
-                buttonContainer.style.gap = '10px';
-                buttonContainer.style.zIndex = '1000';
+                const buttonContainer = document.createElement("div");
+                buttonContainer.style.position = "absolute";
+                buttonContainer.style.top = "-29px";
+                buttonContainer.style.right = "55px";
+                buttonContainer.style.display = "flex";
+                buttonContainer.style.flexDirection = "row";
+                buttonContainer.style.gap = "10px";
+                buttonContainer.style.zIndex = "1000";
 
-                inputField.parentNode.style.position = 'relative';
+                inputField.parentNode.style.position = "relative";
                 inputField.parentNode.appendChild(buttonContainer);
 
                 setButtonStyles(removeDuplicatesButton, {
-                    backgroundColor: 'transparent',
-                    color: '#000000',
-                    border: '1px solid #ccc',
-                    padding: '0px 7px',
-                    marginLeft: '5px',
-                    marginTop: '4px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    visibility: 'hidden',
-                    transition: 'background-color 0.3s, transform 0.1s',
+                    backgroundColor: "transparent",
+                    color: "#000000",
+                    border: "1px solid #ccc",
+                    padding: "0px 7px",
+                    marginLeft: "5px",
+                    marginTop: "4px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    visibility: "hidden",
+                    transition: "background-color 0.3s, transform 0.1s",
                 });
 
                 setButtonStyles(spaceFixButton, {
-                    backgroundColor: 'transparent',
-                    color: '#000000',
-                    border: '1px solid #ccc',
-                    padding: '0px 7px',
-                    marginLeft: '5px',
-                    marginTop: '4px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    visibility: 'hidden',
-                    transition: 'background-color 0.3s, transform 0.1s',
+                    backgroundColor: "transparent",
+                    color: "#000000",
+                    border: "1px solid #ccc",
+                    padding: "0px 7px",
+                    marginLeft: "5px",
+                    marginTop: "4px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    visibility: "hidden",
+                    transition: "background-color 0.3s, transform 0.1s",
                 });
 
                 buttonContainer.appendChild(spaceFixButton);
@@ -1101,60 +1126,60 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 updateButtonVisibility();
             }
 
-            inputField.addEventListener('blur', function() {
+            inputField.addEventListener("blur", function () {
                 updateCursorPosition(false);
             });
-            inputField.addEventListener('focus', function() {
+            inputField.addEventListener("focus", function () {
                 updatePopup();
                 updateCursorPosition(true);
             });
-            inputField.addEventListener('input', function() {
+            inputField.addEventListener("input", function () {
                 updatePopup();
             });
 
-            inputField.addEventListener('keyup', function() {
+            inputField.addEventListener("keyup", function () {
                 updateCursorPosition(true);
             });
-            inputField.addEventListener('click', function() {
+            inputField.addEventListener("click", function () {
                 updateCursorPosition(true);
             });
 
-            spaceFixButton.addEventListener('click', function(event) {
+            spaceFixButton.addEventListener("click", function (event) {
                 event.preventDefault();
                 event.stopPropagation();
                 handleSpaceFixClick(inputField, spaceFixButton);
                 addClickFeedback(spaceFixButton);
             });
 
-            removeDuplicatesButton.addEventListener('click', function(event) {
+            removeDuplicatesButton.addEventListener("click", function (event) {
                 event.preventDefault();
                 event.stopPropagation();
                 handleRemoveDuplicatesClick(inputField, removeDuplicatesButton);
                 addClickFeedback(removeDuplicatesButton);
             });
 
-            removeDuplicatesButton.addEventListener('mouseover', function() {
+            removeDuplicatesButton.addEventListener("mouseover", function () {
                 const duplicates = getDuplicateWords(inputField.value);
                 if (duplicates.length > 0) {
-                    removeDuplicatesButton.title = `重複ワード: ${duplicates.join(', ')}`;
+                    removeDuplicatesButton.title = `重複ワード: ${duplicates.join(", ")}`;
                 } else {
-                    removeDuplicatesButton.title = '';
+                    removeDuplicatesButton.title = "";
                 }
             });
 
             function addClickFeedback(button) {
-                button.style.transform = 'scale(0.9)';
+                button.style.transform = "scale(0.9)";
                 setTimeout(() => {
-                    button.style.transform = 'scale(1)';
+                    button.style.transform = "scale(1)";
                 }, 100);
             }
 
             function attachContainerToElement(container, selector) {
                 const targetButton = document.querySelector(selector);
                 if (targetButton) {
-                    const wrapper = document.createElement('div');
-                    wrapper.style.display = 'inline-flex';
-                    wrapper.style.alignItems = 'flex-end';
+                    const wrapper = document.createElement("div");
+                    wrapper.style.display = "inline-flex";
+                    wrapper.style.alignItems = "flex-end";
 
                     targetButton.parentNode.insertBefore(wrapper, targetButton.nextSibling);
                     wrapper.appendChild(targetButton);
@@ -1163,21 +1188,21 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
             }
 
             function createButton(textContent) {
-                const btn = document.createElement('button');
+                const btn = document.createElement("button");
                 btn.textContent = textContent;
                 return btn;
             }
 
             function createCursorPosition() {
-                const span = document.createElement('span');
-                span.style.marginLeft = '3px';
-                span.style.fontSize = '11px';
-                span.style.verticalAlign = 'middle';
+                const span = document.createElement("span");
+                span.style.marginLeft = "3px";
+                span.style.fontSize = "11px";
+                span.style.verticalAlign = "middle";
                 return span;
             }
 
             function addHighlightStyles() {
-                const style = document.createElement('style');
+                const style = document.createElement("style");
                 style.innerHTML = `
                 .highlight {
                     border: 2px solid #ff0000;
@@ -1188,30 +1213,38 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
             }
 
             function isRegisteredEditPage() {
-                return window.location.href.includes('/forests/TbMainproducts/registered_mainedit/') ||
-                    window.location.href.includes('/forests/tb_mainproducts/registered_mainedit/');
+                return (
+                    window.location.href.includes(
+                        "/forests/TbMainproducts/registered_mainedit/"
+                    ) ||
+                    window.location.href.includes(
+                        "/forests/tb_mainproducts/registered_mainedit/"
+                    )
+                );
             }
 
             function isMainEditPage() {
-                return window.location.href.includes('/forests/TbMainproducts/mainedit/') ||
-                    window.location.href.includes('/forests/tb_mainproducts/mainedit/');
+                return (
+                    window.location.href.includes("/forests/TbMainproducts/mainedit/") ||
+                    window.location.href.includes("/forests/tb_mainproducts/mainedit/")
+                );
             }
 
             function setButtonStyles(button, styles) {
                 Object.assign(button.style, styles);
 
-                button.addEventListener('mouseover', function() {
-                    button.style.backgroundColor = '#f0f0f0';
+                button.addEventListener("mouseover", function () {
+                    button.style.backgroundColor = "#f0f0f0";
                 });
-                button.addEventListener('mouseout', function() {
-                    button.style.backgroundColor = 'transparent';
+                button.addEventListener("mouseout", function () {
+                    button.style.backgroundColor = "transparent";
                 });
 
-                button.addEventListener('mousedown', function() {
-                    button.style.transform = 'scale(0.95)';
+                button.addEventListener("mousedown", function () {
+                    button.style.transform = "scale(0.95)";
                 });
-                button.addEventListener('mouseup', function() {
-                    button.style.transform = 'scale(1)';
+                button.addEventListener("mouseup", function () {
+                    button.style.transform = "scale(1)";
                 });
             }
 
@@ -1223,15 +1256,24 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 }
             }
 
-            function attachButtonToElementInTd(button, tagName, includeText1, includeText2, callback) {
-                const parentTd = inputField.closest('td');
+            function attachButtonToElementInTd(
+            button,
+             tagName,
+             includeText1,
+             includeText2,
+             callback
+            ) {
+                const parentTd = inputField.closest("td");
                 if (!parentTd) {
                     return;
                 }
 
                 const targetElements = parentTd.getElementsByTagName(tagName);
                 for (let i = 0; i < targetElements.length; i++) {
-                    if (targetElements[i].innerHTML.includes(includeText1) && targetElements[i].innerHTML.includes(includeText2)) {
+                    if (
+                        targetElements[i].innerHTML.includes(includeText1) &&
+                        targetElements[i].innerHTML.includes(includeText2)
+                    ) {
                         targetElements[i].appendChild(button);
                         callback();
                         return;
@@ -1248,25 +1290,28 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                     totalLength = inputField.value.length;
                 } else if (focused && popup === document.activeElement) {
                     const selection = window.getSelection();
-                    position = customPosition !== null ? customPosition : selection.anchorOffset;
+                    position =
+                        customPosition !== null ? customPosition : selection.anchorOffset;
                     totalLength = popup.textContent.length;
                 } else {
                     position = 0;
                     totalLength = inputField.value.length;
                 }
 
-                cursorPosition.textContent = focused ? `${position}/${totalLength}` : `${totalLength}`;
+                cursorPosition.textContent = focused
+                    ? `${position}/${totalLength}`
+        : `${totalLength}`;
 
                 if (totalLength > MAX_LENGTH) {
-                    cursorPosition.classList.add('cursor-warning');
+                    cursorPosition.classList.add("cursor-warning");
                 } else {
-                    cursorPosition.classList.remove('cursor-warning');
+                    cursorPosition.classList.remove("cursor-warning");
                 }
             }
 
             function validatePopupInput() {
                 let currentText = popup.textContent;
-                currentText = currentText.replace(/\n/g, ' ');
+                currentText = currentText.replace(/\n/g, " ");
                 if (currentText.length > MAX_LENGTH) {
                     currentText = currentText.substring(0, MAX_LENGTH);
                     popup.textContent = currentText;
@@ -1284,19 +1329,19 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 const hasDuplicates = hasDuplicateWords(value);
 
                 if (hasSpaceIssues) {
-                    spaceFixButton.style.visibility = 'visible';
-                    inputField.classList.add('highlight');
+                    spaceFixButton.style.visibility = "visible";
+                    inputField.classList.add("highlight");
                 } else {
-                    spaceFixButton.style.visibility = 'hidden';
+                    spaceFixButton.style.visibility = "hidden";
                 }
 
                 if (hasDuplicates) {
-                    removeDuplicatesButton.style.visibility = 'visible';
-                    inputField.classList.add('highlight');
+                    removeDuplicatesButton.style.visibility = "visible";
+                    inputField.classList.add("highlight");
                 } else {
-                    removeDuplicatesButton.style.visibility = 'hidden';
+                    removeDuplicatesButton.style.visibility = "hidden";
                     if (!hasSpaceIssues) {
-                        inputField.classList.remove('highlight');
+                        inputField.classList.remove("highlight");
                     }
                 }
 
@@ -1305,10 +1350,10 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
 
             function handleSpaceFixClick(inputField, button) {
                 const trimmedValue = inputField.value.trim();
-                let processedValue = trimmedValue.replace(/\s{2,}/g, ' ');
-                processedValue = processedValue.replace(/　/g, ' ');
+                let processedValue = trimmedValue.replace(/\s{2,}/g, " ");
+                processedValue = processedValue.replace(/　/g, " ");
                 inputField.value = processedValue;
-                button.style.visibility = 'hidden';
+                button.style.visibility = "hidden";
                 updateButtonVisibility();
                 updatePopupContent();
                 updateCursorPosition(document.activeElement === inputField);
@@ -1323,31 +1368,31 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                 const value = inputField.value;
                 const words = value.split(/\s+/);
                 const uniqueWords = [...new Set(words)];
-                const processedValue = uniqueWords.join(' ');
+                const processedValue = uniqueWords.join(" ");
                 if (value !== processedValue) {
                     inputField.value = processedValue;
-                    inputField.classList.add('highlight');
+                    inputField.classList.add("highlight");
                     updatePopupContent();
                 } else {
-                    inputField.classList.remove('highlight');
+                    inputField.classList.remove("highlight");
                 }
-                button.style.visibility = 'hidden';
+                button.style.visibility = "hidden";
                 updateButtonVisibility();
                 updateCursorPosition(document.activeElement === inputField);
             }
 
             function hasDuplicateWords(value) {
-                const words = value.split(/\s+/).filter(word => word.trim() !== '');
+                const words = value.split(/\s+/).filter((word) => word.trim() !== "");
                 const uniqueWords = new Set(words);
                 return uniqueWords.size < words.length;
             }
 
             function getDuplicateWords(value) {
-                const words = value.split(/\s+/).filter(word => word.trim() !== '');
+                const words = value.split(/\s+/).filter((word) => word.trim() !== "");
                 const wordCount = {};
                 const duplicates = [];
 
-                words.forEach(word => {
+                words.forEach((word) => {
                     wordCount[word] = (wordCount[word] || 0) + 1;
                 });
 
@@ -1359,7 +1404,12 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
 
                 return duplicates;
             }
-        });
+        }
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", main);
+        } else {
+            main();
+        }
     }
 
     async function titleInputHelper() {
@@ -2144,7 +2194,7 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                     subtree: true
                 });
 
-                window.addEventListener('load', () => {
+                function mainPopupInit() {
                     addShowSubwordsButton();
 
                     const savedWidth = localStorage.getItem('popupWidth');
@@ -2160,9 +2210,14 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                         }
                     }
 
-                    fetchJSON(data => {
-                    });
-                });
+                    fetchJSON(data => {});
+                }
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', mainPopupInit);
+                } else {
+                    mainPopupInit();
+                }
 
                 //送信機能
                 const API_URL = 'https://work-toolkit.vercel.app/api/github-proxy';
@@ -3572,13 +3627,19 @@ transition: all 0.3s ease-in-out;
             }
         }
 
-        window.addEventListener('load', function () {
+        function mainShipping() {
             openDatabase().then(() => {
                 initialize();
             }).catch(error => {
                 console.error(error);
             });
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', mainShipping);
+        } else {
+            mainShipping();
+        }
     }
 
     function enhanceRemarksEditor(){
@@ -3623,7 +3684,7 @@ transition: all 0.3s ease-in-out;
     `;
         document.head.appendChild(style);
 
-        window.addEventListener('load', function() {
+        function main() {
             const remarksHeader = [...document.querySelectorAll('th[scope="row"]')].find(th => th.textContent.includes("備考"));
 
             if (remarksHeader) {
@@ -3899,7 +3960,13 @@ transition: all 0.3s ease-in-out;
                     inputField.blur();
                 }
             });
-        });
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function presetTextHelper(){
@@ -4206,7 +4273,7 @@ transition: all 0.3s ease-in-out;
             templateListDiv.style.width = `${Math.min(maxWidthNeeded, maxWidth)}px`;
         }
 
-        window.addEventListener('load', (event) => {
+        function main() {
             const sizeTemplates = [
                 { shortText: '【サイズ表提示】', fullText: '画像をご参照ください。' },
                 { shortText: '【メンズインナー】', fullText: '商品のタグ表記や在庫表は海外サイズとなっておりますが、\n在庫表の【】内が一般的な日本サイズでございます。' },
@@ -4240,7 +4307,13 @@ transition: all 0.3s ease-in-out;
             addTemplateButton('TbMainproduct補足説明PC', supplementTemplates);
 
             adjustTemplateListSize();
-        });
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function autoInsertColor(){
@@ -4266,7 +4339,7 @@ transition: all 0.3s ease-in-out;
 
         let skipDialog = false;
 
-        window.addEventListener('load', () => {
+        function main() {
             const inputs = document.querySelectorAll('input[type="text"]:not(#daihyo_syohin_code):not(#TbMainproductWeight), input[type="checkbox"]');
             const selects = document.querySelectorAll('select:not(#TbMainproduct送料設定)');
             const textareas = document.querySelectorAll('textarea:not([data-index="0"]):not([data-index="1"]):not([data-index="2"]):not([data-index="3"]):not(#TbMainproductカラーについて)');
@@ -4343,7 +4416,13 @@ transition: all 0.3s ease-in-out;
                     event.returnValue = '';
                 }
             };
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function enhanceStockTable(){
@@ -4505,7 +4584,11 @@ transition: all 0.3s ease-in-out;
             });
         }
 
-        document.addEventListener('DOMContentLoaded', initHighlighting);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initHighlighting);
+        } else {
+            initHighlighting();
+        }
 
 
         function highlightInputsInStockSettingTable() {
@@ -5633,10 +5716,16 @@ transition: all 0.3s ease-in-out;
             new MutationObserver(() => addPasteListeners()).observe(document.getElementById('axisCode'), { childList: true, subtree: true });
         }
 
-        window.addEventListener('load', () => {
+        function main() {
             addPasteListeners();
             observeDynamicElements();
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function personalMemo(){
@@ -8249,7 +8338,11 @@ transition: all 0.3s ease-in-out;
         buttonContainer.appendChild(toggleRememberStateButton);
         toggleRememberStateButton.onclick = toggleRememberState;
 
-        window.addEventListener('load', restoreState);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', restoreState);
+        } else {
+            restoreState();
+        }
 
         function createAxisButtons(label, axisNames, axis, container) {
             const axisContainer = document.createElement('div');
@@ -8845,7 +8938,7 @@ transition: all 0.3s ease-in-out;
             checkInput(changedFields);
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        function main() {
             initializeInitialValues();
 
             const registeredSaveButton = document.getElementById('registeredSaveButton');
@@ -8865,7 +8958,13 @@ transition: all 0.3s ease-in-out;
             }
 
             showNotificationIfNeeded();
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function axisCodeErrorCheck(){
@@ -9176,8 +9275,8 @@ transition: all 0.3s ease-in-out;
                 attributeFilter: ['style']
             });
         }
-            highlightInputs();
-            observeDynamicElements();
+        highlightInputs();
+        observeDynamicElements();
     }
 
     function autoReplaceAxisCode(){
@@ -9524,7 +9623,7 @@ transition: all 0.3s ease-in-out;
         }
 
 
-        window.addEventListener('load', function () {
+        function main() {
             const original = document.getElementById('syusei_btn');
             const select = document.getElementById('jyuchu_jyotai_kbn');
             const denpyoInput = document.getElementById('jyuchu_denpyo_no');
@@ -9557,7 +9656,13 @@ transition: all 0.3s ease-in-out;
                     setupOverlayBehavior(currentSelectValue, original, overlay);
                 }
             }, 500);
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function applyTagStyle(){
@@ -9751,7 +9856,7 @@ transition: all 0.3s ease-in-out;
             }
         }, 700);
 
-        window.addEventListener('load', () => {
+        function main() {
             if (isOldStyle()) {
                 addCustomStyles();
                 applyCustomStyle();
@@ -9764,7 +9869,13 @@ transition: all 0.3s ease-in-out;
                     });
                 }
             }
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function denpyoAutoReflect(){
@@ -9773,7 +9884,7 @@ transition: all 0.3s ease-in-out;
         const NEW_KEY = 'jyuchu_denpyo_no';
         const FLAG_KEY = 'update_flag';
 
-        window.addEventListener('load', () => {
+        function main() {
             localStorage.removeItem(NEW_KEY);
 
             const inputElem = document.getElementById('jyuchu_denpyo_no');
@@ -9820,7 +9931,13 @@ transition: all 0.3s ease-in-out;
                 }
             });
             observer.observe(document.body, { childList: true, subtree: true });
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
 
         window.addEventListener('storage', (event) => {
             if (event.key === FLAG_KEY) {
@@ -10062,7 +10179,7 @@ transition: all 0.3s ease-in-out;
     }
 
     function jyuchuDateCheck() {
-        window.addEventListener('load', () => {
+        function main() {
             const inputDate = document.getElementById('jyuchu_bi');
             if (!inputDate) return;
 
@@ -10201,7 +10318,13 @@ transition: all 0.3s ease-in-out;
 
             checkDate();
             setInterval(checkDate, 1000);
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function freeStockCheck(){
@@ -10490,7 +10613,7 @@ transition: all 0.3s ease-in-out;
         }
 
         if (url.startsWith("https://main.next-engine.com/Userjyuchu/jyuchuInp")) {
-            window.addEventListener('load', async () => {
+            function main() {
                 const select = document.getElementById('tenpo_code');
                 const moruBtn = document.getElementById('show-moru-btn');
                 let prevJyuchuNo = null;
@@ -10506,7 +10629,8 @@ transition: all 0.3s ease-in-out;
                 setInterval(monitorJyuchuNo, 300);
 
                 if (select && moruBtn) {
-                    moruBtn.addEventListener('click', async () => {
+                    moruBtn.addEventListener('click', async (e) => {
+
                         const jyuchuNoInput = document.getElementById('jyuchu_denpyo_no');
                         const myJyuchuNo = jyuchuNoInput ? jyuchuNoInput.value : null;
                         if (myJyuchuNo) {
@@ -10553,8 +10677,13 @@ transition: all 0.3s ease-in-out;
                         }
                     });
                 }, 500);
+            }
 
-            });
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', main);
+            } else {
+                main();
+            }
         }
 
         if (url.startsWith("https://admin.shopify.com/store/eh8nfp-gh/orders?start=MQ%3D%3D")) {
@@ -10649,6 +10778,23 @@ transition: all 0.3s ease-in-out;
 
             observer.observe(document.body, { childList: true, subtree: true });
         }
+
+        function updateMoruBtnBorder() {
+            const moruBtn = document.getElementById('show-moru-btn');
+            if (!moruBtn) return;
+            if (window._autoLogin_ctrlKey) {
+                moruBtn.style.boxShadow = '0 0 0 2.5px #007aff, 0 1px 2px rgba(0,0,0,0.04)';
+                moruBtn.style.borderColor = '#3c80cf';
+                moruBtn.style.background = '#f2f8fc';
+                moruBtn.style.position = 'relative';
+                moruBtn.style.top = '-2px';
+            } else {
+                moruBtn.style.boxShadow = '';
+                moruBtn.style.borderColor = '';
+                moruBtn.style.background = '';
+                moruBtn.style.top = '';
+            }
+        }
     }
 
     function denpyoBunkatsuAutoReflect() {
@@ -10656,7 +10802,7 @@ transition: all 0.3s ease-in-out;
         const NEW_KEY = 'bunkatsu_auto_jyuchu_denpyo_no_new';
         const FLAG_KEY = 'bunkatsu_auto_update_flag';
 
-        window.addEventListener('load', () => {
+        function main() {
             const observer = new MutationObserver((mutations, obs) => {
                 const btn = document.getElementById('ne_dlg_btn2_bunkatuDlg');
                 if (btn) {
@@ -10674,9 +10820,14 @@ transition: all 0.3s ease-in-out;
                 }
             });
             observer.observe(document.body, { childList: true, subtree: true });
-        });
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
 
-        window.addEventListener('load', () => {
+        function main2() {
             const inputElem = document.getElementById('jyuchu_denpyo_no');
             const oldVal = localStorage.getItem(OLD_KEY);
             if (inputElem && oldVal) {
@@ -10744,7 +10895,13 @@ transition: all 0.3s ease-in-out;
                     doMark();
                 }
             }
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main2);
+        } else {
+            main2();
+        }
 
         window.addEventListener('storage', (event) => {
             if (event.key === FLAG_KEY) {
@@ -11902,9 +12059,421 @@ transition: all 0.3s ease-in-out;
         }, 1000);
     }
 
+    function deliveryNoteTemplateSupport(){
+        GM_addStyle(`
+    *, *::before, *::after {
+    box-sizing: border-box;
+}
+.template-list-popup {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.template-content {
+    width: auto;
+}
+.template-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 17px;
+    width: auto;
+    padding-bottom: 2px;
+    margin-left: 3px;
+    background: #fff;
+    border: 1px solid #bbb;
+    border-radius: 7px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.template-btn:hover {
+    background: #e5fbe6;
+}
+.template-list-popup {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 10px 18px 10px 16px;
+    z-index: 10099;
+    position: fixed;
+    top: 18px;
+    right: 24px;
+    width: 600px;
+    max-width: 95vw;
+    max-height: 420px;
+    overflow: auto;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+    display: none;
+    border-radius: 10px;
+    font-size: 13px;
+}
+.template-div {
+    padding: 7px 0 2px 0;
+    border-top: 1px solid #eee;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6em;
+}
+.template-div:first-child { border-top: none; }
+.template-header-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 0.6em;
+}
+
+.title-text-div {flex-grow:1;cursor:pointer;}
+.template-content {
+    width: 100%;
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: height 0.3s, opacity 0.3s;
+    font-size: 13px;
+    padding-left: 8px;
+    color: #333;
+    margin-top: 2px;
+}
+.template-content.show {
+    height: auto;
+    opacity: 1;
+    padding: 8px 0 6px 8px;
+}
+.paste-button-template {
+    background: #fff;
+    color: #0d7b3e;
+    border: 1px solid #7ed17e;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 15px;
+    width: 25px;
+    height: 25px;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+.paste-button-template::before { content: '📝'; font-size: 16px; }
+.paste-button-template:hover { background: #c6f7cb; }
+.editable-textarea {
+    width: 98%;
+    min-height: 125px;
+    font-size: 14px;
+    margin: 0 0 0 0;
+    box-sizing: border-box;
+    resize: vertical;
+    border-radius: 5px;
+    border: 1px solid #d1d6e0;
+    padding: 7px;
+}
+.template-title {
+    font-weight: bold;
+    font-size: 16px;
+    color: #244c8b;
+    margin-right: 6px;
+    letter-spacing: 0.02em;
+    display: inline-flex;
+    align-items: center;
+}
+.no-content-label {
+    color: #aaa;
+    font-style: italic;
+}
+.editable-label {
+    font-size: 12px;
+    color: #24996e;
+    margin: 0 0 0 4px;
+    padding: 2px 7px;
+    background: #e6f5ec;
+    border-radius: 7px;
+    display: inline-block;
+    vertical-align: middle;
+    font-weight: normal;
+}
+.template-clickable-group:hover {
+    transform: translateY(-1.5px);
+}
+    `);
+
+        const TEMPLATE_URL = 'http://tk2-217-18298.vs.sakura.ne.jp/issues/406132';
+
+        let templates = [];
+        let templatesLoaded = false;
+        let loadingError = "";
+
+        function parseTemplatesFromText(rawText) {
+            const blocks = rawText.split(/-{3,}/).map(s => s.trim()).filter(Boolean);
+            const result = [];
+
+            for (const block of blocks) {
+                const titleMatch = block.match(/^タイトル：([^\r\n]+)/m);
+                const editMatch = block.match(/^編集：(可能|不可)/m);
+                const bodyMatch = block.match(/^本文：([\s\S]*)$/m);
+
+                const titleText = titleMatch ? titleMatch[1].trim() : '';
+                const editable = editMatch ? (editMatch[1] === '可能') : false;
+
+                let body = '';
+                if (bodyMatch) {
+                    body = bodyMatch[1].trim();
+                } else {
+                    body = '';
+                }
+
+                if (body === '無し') {
+                    body = '';
+                } else {
+                    body = body.trim();
+                }
+
+                if (!titleText) continue;
+
+                result.push({
+                    titleText: titleText,
+                    fullText: body,
+                    editable: editable,
+                    body: body
+                });
+            }
+            return result;
+        }
+
+        function fetchTemplates(url, callback) {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: url,
+                timeout: 10000,
+                onload: function(response) {
+                    try {
+                        const finalUrl = response.finalUrl || response.responseURL || url;
+                        if (finalUrl.includes('/login')) {
+                            loadingError = "[認証エラー] Redmine未ログインのためテンプレート取得不可です。ログインしてください。";
+                            return callback([]);
+                        }
+                        if (response.status !== 200) {
+                            loadingError = `[エラー] ステータス: ${response.status} で取得失敗`;
+                            return callback([]);
+                        }
+                        if (!response.responseText) {
+                            loadingError = "[エラー] ページ内容が空です。";
+                            return callback([]);
+                        }
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(response.responseText, 'text/html');
+                        if (!doc) {
+                            loadingError = "[エラー] DOMパース失敗。";
+                            return callback([]);
+                        }
+                        const descriptionDiv = doc.querySelector('div.description');
+                        if (!descriptionDiv) {
+                            loadingError = "[エラー] class='description' が見つかりません";
+                            return callback([]);
+                        }
+                        const wikiDiv = descriptionDiv.querySelector('.wiki');
+                        if (!wikiDiv) {
+                            loadingError = "[エラー] class='wiki' が見つかりません（description内）";
+                            return callback([]);
+                        }
+                        let wikiText = wikiDiv.innerHTML
+                        .replace(/<br\s*\/?>/gi, '\n')
+                        .replace(/<\/?p>/gi, '\n')
+                        .replace(/<[^>]+>/g, '');
+
+                        const list = parseTemplatesFromText(wikiText);
+                        if(list.length === 0){
+                            loadingError = "[注意] テンプレートが空です。";
+                        }
+                        callback(list);
+                    } catch (e) {
+                        loadingError = "[例外エラー] " + e;
+                        callback([]);
+                    }
+                },
+                onerror: function() {
+                    loadingError = "[通信エラー] 通信エラーでテンプレートを取得できません。";
+                    callback([]);
+                },
+                ontimeout: function() {
+                    loadingError = "[タイムアウト] タイムアウトでテンプレートを取得できません。";
+                    callback([]);
+                }
+            });
+        }
+
+        function createPopupTemplateList(getTargetInput, templates) {
+            let popupDiv = document.getElementById('template-popup');
+            if (popupDiv) popupDiv.remove();
+
+            popupDiv = document.createElement('div');
+            popupDiv.className = 'template-list-popup';
+            popupDiv.id = 'template-popup';
+
+            if (!templatesLoaded && !loadingError) {
+                popupDiv.textContent = 'テンプレート読込中...';
+            } else if (loadingError) {
+                popupDiv.textContent = loadingError;
+            } else if (templates.length === 0) {
+                popupDiv.textContent = 'テンプレートが見つかりません';
+            } else {
+                templates.forEach((template, i) => {
+                    const templateDiv = document.createElement('div');
+                    templateDiv.className = 'template-div';
+
+                    const headerRow = document.createElement('div');
+                    headerRow.className = 'template-header-row';
+
+                    const clickableGroup = document.createElement('span');
+                    clickableGroup.style.display = 'inline-flex';
+                    clickableGroup.style.alignItems = 'center';
+                    if (template.fullText) {
+                        clickableGroup.className = 'template-clickable-group';
+                        clickableGroup.style.cursor = 'pointer';
+                    }
+
+                    if (template.fullText) {
+                        const icon = document.createElement('span');
+                        icon.textContent = '🗒️';
+                        icon.style.fontSize = '20px';
+                        icon.style.marginRight = '3px';
+                        icon.style.verticalAlign = 'middle';
+                        clickableGroup.appendChild(icon);
+                    }
+
+                    const titleSpan = document.createElement('span');
+                    titleSpan.className = 'template-title';
+                    titleSpan.textContent = template.titleText;
+                    clickableGroup.appendChild(titleSpan);
+
+                    if (template.fullText && template.editable) {
+                        const editableLabel = document.createElement('span');
+                        editableLabel.className = 'editable-label';
+                        editableLabel.style.marginLeft = '7px';
+                        editableLabel.textContent = '編集可能';
+                        clickableGroup.appendChild(editableLabel);
+                    }
+
+                    if (template.fullText) {
+                        clickableGroup.addEventListener('click', function () {
+                            templateContentDiv.classList.toggle('show');
+                        });
+                    }
+
+                    const pasteButton = document.createElement('button');
+                    pasteButton.type = 'button';
+                    pasteButton.className = 'paste-button-template';
+                    pasteButton.title = '貼り付け';
+                    pasteButton.addEventListener('click', function (event) {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        const targetInput = getTargetInput();
+                        let text = template.fullText ? template.fullText : template.titleText;
+                        if (targetInput) {
+                            if (targetInput.value) targetInput.value += '\n' + text;
+                            else targetInput.value = text;
+                            targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        } else {
+                            alert('id="nouhinsyo_text" の要素が見つかりません');
+                        }
+                        popupDiv.style.display = 'none';
+                    });
+
+                    headerRow.appendChild(clickableGroup);
+                    headerRow.appendChild(pasteButton);
+                    templateDiv.appendChild(headerRow);
+
+                    let templateContentDiv = document.createElement('div');
+                    templateContentDiv.className = 'template-content';
+                    templateContentDiv.style.whiteSpace = 'pre-wrap';
+
+                    if (template.fullText && template.editable) {
+                        const textarea = document.createElement('textarea');
+                        textarea.className = 'editable-textarea';
+                        textarea.value = template.body;
+                        textarea.addEventListener('input', (e) => {
+                            template.fullText = textarea.value;
+                        });
+                        templateContentDiv.appendChild(textarea);
+                    } else if (template.fullText) {
+                        templateContentDiv.textContent = template.fullText;
+                    }
+
+                    popupDiv.appendChild(templateDiv);
+                    if (template.fullText) popupDiv.appendChild(templateContentDiv);
+                });
+
+            }
+
+            document.body.appendChild(popupDiv);
+            return popupDiv;
+        }
+
+        function insertTemplateButton() {
+            const targetTd = Array.from(document.querySelectorAll('td.group_head'))
+            .find(td => td.textContent.includes('納品書特記事項'));
+            if (!targetTd) return;
+            if (targetTd.querySelector('.template-btn')) return;
+
+            const getTargetInput = () => document.getElementById('nouhinsyo_text');
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'template-btn';
+            btn.title = 'テンプレート挿入';
+            btn.innerText = '定型文';
+
+            btn.onclick = e => {
+                e.stopPropagation();
+
+                let popupDiv = document.getElementById('template-popup');
+                if (popupDiv && popupDiv.style.display === 'block') {
+                    popupDiv.style.display = 'none';
+                    return;
+                }
+
+                popupDiv = createPopupTemplateList(getTargetInput, templates);
+                popupDiv.style.display = 'block';
+
+                const closePopup = function (ev) {
+                    if (!popupDiv.contains(ev.target) && ev.target !== btn) {
+                        popupDiv.style.display = 'none';
+                        document.removeEventListener('mousedown', closePopup);
+                    }
+                };
+                setTimeout(() => {
+                    document.addEventListener('mousedown', closePopup);
+                });
+
+                const escClose = function(ev) {
+                    if (ev.key === 'Escape') {
+                        popupDiv.style.display = 'none';
+                        document.removeEventListener('keydown', escClose);
+                        document.removeEventListener('mousedown', closePopup);
+                    }
+                };
+                document.addEventListener('keydown', escClose);
+            };
+
+            const openLink = targetTd.querySelector('a#nouhinsyo_sw');
+            if (openLink) {
+                openLink.after(btn);
+            } else {
+                targetTd.appendChild(btn);
+            }
+        }
+
+        fetchTemplates(TEMPLATE_URL, function(list) {
+            templates = list;
+            templatesLoaded = true;
+            insertTemplateButton();
+        });
+    }
+
     runPageScripts();
 
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: df820e145648efc97573e70887ed3647cda7c03835bca5f5e90e3c4eefa58d10
+// @integrity-hash: 6d0ec58cfbf57746ea8da1dbfdf52a03ffbb3fd7b68832cde97d66ce2b66c014
