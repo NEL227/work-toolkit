@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.6.0
+// @version      1.6.1
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -9658,10 +9658,10 @@ transition: all 0.3s ease-in-out;
             }, 500);
         }
 
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', main);
-        } else {
+        if (document.readyState === 'complete') {
             main();
+        } else {
+            window.addEventListener('load', main);
         }
     }
 
@@ -12476,4 +12476,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: 6d0ec58cfbf57746ea8da1dbfdf52a03ffbb3fd7b68832cde97d66ce2b66c014
+// @integrity-hash: 53972e715c8bda08891f5add8d2bac6c36e612c5bca85c16a97ad2bb4f3b59e7
