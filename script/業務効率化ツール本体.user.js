@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.6.1
+// @version      1.6.2
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -12196,6 +12196,26 @@ transition: all 0.3s ease-in-out;
 .template-clickable-group:hover {
     transform: translateY(-1.5px);
 }
+.spinner {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+}
+.spinner:after {
+  content: " ";
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid #74c97f;
+  border-color: #74c97f transparent #74c97f transparent;
+  animation: spinner-anim 1.2s linear infinite;
+}
+@keyframes spinner-anim {
+  0% { transform: rotate(0deg);}
+  100% { transform: rotate(360deg);}
+}
     `);
 
         const TEMPLATE_URL = 'http://tk2-217-18298.vs.sakura.ne.jp/issues/406132';
@@ -12203,6 +12223,7 @@ transition: all 0.3s ease-in-out;
         let templates = [];
         let templatesLoaded = false;
         let loadingError = "";
+        let currentPopupDiv = null;
 
         function parseTemplatesFromText(rawText) {
             const blocks = rawText.split(/-{3,}/).map(s => s.trim()).filter(Boolean);
@@ -12312,7 +12333,20 @@ transition: all 0.3s ease-in-out;
             popupDiv.id = 'template-popup';
 
             if (!templatesLoaded && !loadingError) {
-                popupDiv.textContent = 'テンプレート読込中...';
+                const loadingDiv = document.createElement('div');
+                loadingDiv.style.display = 'flex';
+                loadingDiv.style.alignItems = 'center';
+                loadingDiv.style.gap = '10px';
+
+                const spinner = document.createElement('span');
+                spinner.className = 'spinner';
+                loadingDiv.appendChild(spinner);
+
+                const loadingText = document.createElement('span');
+                loadingText.textContent = 'テンプレート取得中...';
+                loadingDiv.appendChild(loadingText);
+
+                popupDiv.appendChild(loadingDiv);
             } else if (loadingError) {
                 popupDiv.textContent = loadingError;
             } else if (templates.length === 0) {
@@ -12416,6 +12450,8 @@ transition: all 0.3s ease-in-out;
             if (!targetTd) return;
             if (targetTd.querySelector('.template-btn')) return;
 
+            targetTd.style.position = "relative";
+
             const getTargetInput = () => document.getElementById('nouhinsyo_text');
 
             const btn = document.createElement('button');
@@ -12424,35 +12460,42 @@ transition: all 0.3s ease-in-out;
             btn.title = 'テンプレート挿入';
             btn.innerText = '定型文';
 
+            btn.style.position = "absolute";
+            btn.style.top = "3px";
+            btn.style.right = "0";
+            btn.style.zIndex = "10";
+
             btn.onclick = e => {
                 e.stopPropagation();
 
-                let popupDiv = document.getElementById('template-popup');
-                if (popupDiv && popupDiv.style.display === 'block') {
-                    popupDiv.style.display = 'none';
+                if (currentPopupDiv && currentPopupDiv.style.display === 'block') {
+                    currentPopupDiv.style.display = 'none';
+                    currentPopupDiv = null;
                     return;
                 }
 
-                popupDiv = createPopupTemplateList(getTargetInput, templates);
-                popupDiv.style.display = 'block';
+                currentPopupDiv = createPopupTemplateList(getTargetInput, templates);
+                currentPopupDiv.style.display = 'block';
 
-                const closePopup = function (ev) {
-                    if (!popupDiv.contains(ev.target) && ev.target !== btn) {
-                        popupDiv.style.display = 'none';
+                function closePopup(ev) {
+                    if (!currentPopupDiv.contains(ev.target) && ev.target !== btn) {
+                        currentPopupDiv.style.display = 'none';
                         document.removeEventListener('mousedown', closePopup);
+                        currentPopupDiv = null;
                     }
-                };
+                }
                 setTimeout(() => {
                     document.addEventListener('mousedown', closePopup);
                 });
 
-                const escClose = function(ev) {
+                function escClose(ev) {
                     if (ev.key === 'Escape') {
-                        popupDiv.style.display = 'none';
+                        currentPopupDiv.style.display = 'none';
                         document.removeEventListener('keydown', escClose);
                         document.removeEventListener('mousedown', closePopup);
+                        currentPopupDiv = null;
                     }
-                };
+                }
                 document.addEventListener('keydown', escClose);
             };
 
@@ -12464,10 +12507,46 @@ transition: all 0.3s ease-in-out;
             }
         }
 
+        const getTargetInput = () => document.getElementById('nouhinsyo_text');
+
+        function updatePopupIfOpen() {
+            if (currentPopupDiv && currentPopupDiv.style.display === 'block') {
+                document.removeEventListener('keydown', escClose);
+                const newPopupDiv = createPopupTemplateList(getTargetInput, templates);
+                newPopupDiv.style.display = 'block';
+                currentPopupDiv.replaceWith(newPopupDiv);
+                currentPopupDiv = newPopupDiv;
+
+                function closePopup(ev) {
+                    if (!currentPopupDiv.contains(ev.target)) {
+                        currentPopupDiv.style.display = 'none';
+                        document.removeEventListener('mousedown', closePopup);
+                        document.removeEventListener('keydown', escClose);
+                        currentPopupDiv = null;
+                    }
+                }
+                setTimeout(() => {
+                    document.addEventListener('mousedown', closePopup);
+                });
+
+                function escClose(ev) {
+                    if (ev.key === 'Escape') {
+                        currentPopupDiv.style.display = 'none';
+                        document.removeEventListener('keydown', escClose);
+                        document.removeEventListener('mousedown', closePopup);
+                        currentPopupDiv = null;
+                    }
+                }
+                document.addEventListener('keydown', escClose);
+            }
+        }
+
+        insertTemplateButton();
+
         fetchTemplates(TEMPLATE_URL, function(list) {
             templates = list;
             templatesLoaded = true;
-            insertTemplateButton();
+            updatePopupIfOpen();
         });
     }
 
@@ -12476,4 +12555,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: 53972e715c8bda08891f5add8d2bac6c36e612c5bca85c16a97ad2bb4f3b59e7
+// @integrity-hash: 9c9cccc2c1a1284ee9144c436be1b2e95bd8844561623a48fb919b27adbb3053
