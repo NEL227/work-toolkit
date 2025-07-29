@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体[テスト]
 // @namespace    http://tampermonkey.net/
-// @version      1.5.12
+// @version      1.6
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -18,6 +18,7 @@
 // @connect      tk2-217-18298.vs.sakura.ne.jp
 // ==/UserScript==
 
+
 (async function () {
     const settingsKeys = [
         "modifyHelpLinks", "enhanceTitleEditor", "titleInputHelper", "costCalculator",
@@ -27,6 +28,7 @@
         "orderStatusCheck", "bulkOrderCheck", "axisReminder", "nonColorSizeReminder",
         "axisCodeErrorCheck", "autoReplaceAxisCode","denpyoUpdateGuard","applyTagStyle","denpyoAutoReflect",
         "jyuchuDateCheck", "freeStockCheck", "autoLogin", "denpyoBunkatsuAutoReflect", "doukonCheck",
+        "deliveryNoteTemplateSupport", "remarksNoteTemplateSupport",
     ];
 
     const settings = {};
@@ -174,6 +176,8 @@ ${createCheckboxAndDetails('freeStockCheck', 'フリー在庫数チェック', '
 ${createCheckboxAndDetails('autoLogin', '自動ログイン', '楽天系モールへの自動ログイン<br>前提条件としてWebsystemへのログインと楽天IDとパスワードへの事前入力が必須<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.03.00" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
 ${createCheckboxAndDetails('denpyoBunkatsuAutoReflect', '分割伝票処理自動化', '伝票分割時に元伝票・分割先に伝票番号を作業用欄へ自動反映<br>入荷待ちタグの挿入と確認チェックの自動化<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.4.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
 ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受注画面で同梱可否を自動判定し、実行操作をサポート<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.5.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
+${createCheckboxAndDetails('deliveryNoteTemplateSupport', '納品書特記事項 定型文入力補助', '納品書特記事項の横に「定型文」ボタンを追加<br>クリックで定型文の一覧を表示<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.6.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
+${createCheckboxAndDetails('remarksNoteTemplateSupport', '備考 定型文入力補助', '備考の横に「定型文」ボタンを追加<br>クリックで定型文の一覧を表示<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.7.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
                 </div>
               </details>
             </section>
@@ -544,6 +548,16 @@ ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受
                     name: '同梱チェックサポート',
                     isEnabled: () => settings.doukonCheck,
                     run: doukonCheck,
+                },
+                {
+                    name: '納品書特記事項 定型文入力補助',
+                    isEnabled: () => settings.deliveryNoteTemplateSupport,
+                    run: deliveryNoteTemplateSupport,
+                },
+                {
+                    name: '備考 定型文入力補助',
+                    isEnabled: () => settings.remarksNoteTemplateSupport,
+                    run: remarksNoteTemplateSupport,
                 },
             ],
         },
@@ -4298,7 +4312,7 @@ transition: all 0.3s ease-in-out;
             addTemplateButton('TbMainproduct補足説明PC', supplementTemplates);
 
             adjustTemplateListSize();
-        }
+        };
 
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', main);
@@ -4330,7 +4344,7 @@ transition: all 0.3s ease-in-out;
 
         let skipDialog = false;
 
-        window.addEventListener('load', () => {
+        function main() {
             const inputs = document.querySelectorAll('input[type="text"]:not(#daihyo_syohin_code):not(#TbMainproductWeight), input[type="checkbox"]');
             const selects = document.querySelectorAll('select:not(#TbMainproduct送料設定)');
             const textareas = document.querySelectorAll('textarea:not([data-index="0"]):not([data-index="1"]):not([data-index="2"]):not([data-index="3"]):not(#TbMainproductカラーについて)');
@@ -4407,7 +4421,13 @@ transition: all 0.3s ease-in-out;
                     event.returnValue = '';
                 }
             };
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function enhanceStockTable(){
@@ -4569,7 +4589,11 @@ transition: all 0.3s ease-in-out;
             });
         }
 
-        document.addEventListener('DOMContentLoaded', initHighlighting);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initHighlighting);
+        } else {
+            initHighlighting();
+        }
 
 
         function highlightInputsInStockSettingTable() {
@@ -5697,10 +5721,16 @@ transition: all 0.3s ease-in-out;
             new MutationObserver(() => addPasteListeners()).observe(document.getElementById('axisCode'), { childList: true, subtree: true });
         }
 
-        window.addEventListener('load', () => {
+        function main() {
             addPasteListeners();
             observeDynamicElements();
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function personalMemo(){
@@ -8313,7 +8343,11 @@ transition: all 0.3s ease-in-out;
         buttonContainer.appendChild(toggleRememberStateButton);
         toggleRememberStateButton.onclick = toggleRememberState;
 
-        window.addEventListener('load', restoreState);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', restoreState);
+        } else {
+            restoreState();
+        }
 
         function createAxisButtons(label, axisNames, axis, container) {
             const axisContainer = document.createElement('div');
@@ -8909,7 +8943,7 @@ transition: all 0.3s ease-in-out;
             checkInput(changedFields);
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        function main() {
             initializeInitialValues();
 
             const registeredSaveButton = document.getElementById('registeredSaveButton');
@@ -8929,7 +8963,13 @@ transition: all 0.3s ease-in-out;
             }
 
             showNotificationIfNeeded();
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function axisCodeErrorCheck(){
@@ -9588,7 +9628,7 @@ transition: all 0.3s ease-in-out;
         }
 
 
-        window.addEventListener('load', function () {
+        function main() {
             const original = document.getElementById('syusei_btn');
             const select = document.getElementById('jyuchu_jyotai_kbn');
             const denpyoInput = document.getElementById('jyuchu_denpyo_no');
@@ -9621,7 +9661,13 @@ transition: all 0.3s ease-in-out;
                     setupOverlayBehavior(currentSelectValue, original, overlay);
                 }
             }, 500);
-        });
+        }
+
+        if (document.readyState === 'complete') {
+            main();
+        } else {
+            window.addEventListener('load', main);
+        }
     }
 
     function applyTagStyle(){
@@ -9815,7 +9861,7 @@ transition: all 0.3s ease-in-out;
             }
         }, 700);
 
-        window.addEventListener('load', () => {
+        function main() {
             if (isOldStyle()) {
                 addCustomStyles();
                 applyCustomStyle();
@@ -9828,7 +9874,13 @@ transition: all 0.3s ease-in-out;
                     });
                 }
             }
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function denpyoAutoReflect(){
@@ -9837,7 +9889,7 @@ transition: all 0.3s ease-in-out;
         const NEW_KEY = 'jyuchu_denpyo_no';
         const FLAG_KEY = 'update_flag';
 
-        window.addEventListener('load', () => {
+        function main() {
             localStorage.removeItem(NEW_KEY);
 
             const inputElem = document.getElementById('jyuchu_denpyo_no');
@@ -9884,7 +9936,13 @@ transition: all 0.3s ease-in-out;
                 }
             });
             observer.observe(document.body, { childList: true, subtree: true });
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
 
         window.addEventListener('storage', (event) => {
             if (event.key === FLAG_KEY) {
@@ -10126,7 +10184,7 @@ transition: all 0.3s ease-in-out;
     }
 
     function jyuchuDateCheck() {
-        window.addEventListener('load', () => {
+        function main() {
             const inputDate = document.getElementById('jyuchu_bi');
             if (!inputDate) return;
 
@@ -10265,7 +10323,13 @@ transition: all 0.3s ease-in-out;
 
             checkDate();
             setInterval(checkDate, 1000);
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
     }
 
     function freeStockCheck(){
@@ -10554,7 +10618,7 @@ transition: all 0.3s ease-in-out;
         }
 
         if (url.startsWith("https://main.next-engine.com/Userjyuchu/jyuchuInp")) {
-            window.addEventListener('load', async () => {
+            function main() {
                 const select = document.getElementById('tenpo_code');
                 const moruBtn = document.getElementById('show-moru-btn');
                 let prevJyuchuNo = null;
@@ -10570,7 +10634,8 @@ transition: all 0.3s ease-in-out;
                 setInterval(monitorJyuchuNo, 300);
 
                 if (select && moruBtn) {
-                    moruBtn.addEventListener('click', async () => {
+                    moruBtn.addEventListener('click', async (e) => {
+
                         const jyuchuNoInput = document.getElementById('jyuchu_denpyo_no');
                         const myJyuchuNo = jyuchuNoInput ? jyuchuNoInput.value : null;
                         if (myJyuchuNo) {
@@ -10617,8 +10682,13 @@ transition: all 0.3s ease-in-out;
                         }
                     });
                 }, 500);
+            }
 
-            });
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', main);
+            } else {
+                main();
+            }
         }
 
         if (url.startsWith("https://admin.shopify.com/store/eh8nfp-gh/orders?start=MQ%3D%3D")) {
@@ -10713,6 +10783,23 @@ transition: all 0.3s ease-in-out;
 
             observer.observe(document.body, { childList: true, subtree: true });
         }
+
+        function updateMoruBtnBorder() {
+            const moruBtn = document.getElementById('show-moru-btn');
+            if (!moruBtn) return;
+            if (window._autoLogin_ctrlKey) {
+                moruBtn.style.boxShadow = '0 0 0 2.5px #007aff, 0 1px 2px rgba(0,0,0,0.04)';
+                moruBtn.style.borderColor = '#3c80cf';
+                moruBtn.style.background = '#f2f8fc';
+                moruBtn.style.position = 'relative';
+                moruBtn.style.top = '-2px';
+            } else {
+                moruBtn.style.boxShadow = '';
+                moruBtn.style.borderColor = '';
+                moruBtn.style.background = '';
+                moruBtn.style.top = '';
+            }
+        }
     }
 
     function denpyoBunkatsuAutoReflect() {
@@ -10720,7 +10807,7 @@ transition: all 0.3s ease-in-out;
         const NEW_KEY = 'bunkatsu_auto_jyuchu_denpyo_no_new';
         const FLAG_KEY = 'bunkatsu_auto_update_flag';
 
-        window.addEventListener('load', () => {
+        function main() {
             const observer = new MutationObserver((mutations, obs) => {
                 const btn = document.getElementById('ne_dlg_btn2_bunkatuDlg');
                 if (btn) {
@@ -10738,9 +10825,14 @@ transition: all 0.3s ease-in-out;
                 }
             });
             observer.observe(document.body, { childList: true, subtree: true });
-        });
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
 
-        window.addEventListener('load', () => {
+        function main2() {
             const inputElem = document.getElementById('jyuchu_denpyo_no');
             const oldVal = localStorage.getItem(OLD_KEY);
             if (inputElem && oldVal) {
@@ -10808,7 +10900,13 @@ transition: all 0.3s ease-in-out;
                     doMark();
                 }
             }
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main2);
+        } else {
+            main2();
+        }
 
         window.addEventListener('storage', (event) => {
             if (event.key === FLAG_KEY) {
@@ -11966,9 +12064,997 @@ transition: all 0.3s ease-in-out;
         }, 1000);
     }
 
+    function deliveryNoteTemplateSupport(){
+        GM_addStyle(`
+    *, *::before, *::after {
+    box-sizing: border-box;
+}
+.template-list-popup {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.template-content {
+    width: auto;
+}
+.template-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 17px;
+    width: auto;
+    padding-bottom: 2px;
+    margin-left: 3px;
+    background: #fff;
+    border: 1px solid #bbb;
+    border-radius: 7px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.template-btn:hover {
+    background: #e5fbe6;
+}
+.template-list-popup {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 10px 18px 10px 16px;
+    z-index: 10099;
+    position: fixed;
+    top: 18px;
+    right: 24px;
+    width: 600px;
+    max-width: 95vw;
+    max-height: 420px;
+    overflow: auto;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+    display: none;
+    border-radius: 10px;
+    font-size: 13px;
+}
+.template-div {
+    padding: 7px 0 2px 0;
+    border-top: 1px solid #eee;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6em;
+}
+.template-div:first-child { border-top: none; }
+.template-header-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 0.6em;
+}
+
+.title-text-div {flex-grow:1;cursor:pointer;}
+.template-content {
+    width: 100%;
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: height 0.3s, opacity 0.3s;
+    font-size: 13px;
+    padding-left: 8px;
+    color: #333;
+    margin-top: 2px;
+}
+.template-content.show {
+    height: auto;
+    opacity: 1;
+    padding: 8px 0 6px 8px;
+}
+.paste-button-template {
+    background: #fff;
+    color: #0d7b3e;
+    border: 1px solid #7ed17e;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 15px;
+    width: 25px;
+    height: 25px;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+.paste-button-template::before { content: '📝'; font-size: 16px; }
+.paste-button-template:hover { background: #c6f7cb; }
+.editable-textarea {
+    width: 98%;
+    min-height: 125px;
+    font-size: 14px;
+    margin: 0 0 0 0;
+    box-sizing: border-box;
+    resize: vertical;
+    border-radius: 5px;
+    border: 1px solid #d1d6e0;
+    padding: 7px;
+}
+.template-title {
+    font-weight: bold;
+    font-size: 16px;
+    color: #244c8b;
+    margin-right: 6px;
+    letter-spacing: 0.02em;
+    display: inline-flex;
+    align-items: center;
+}
+.no-content-label {
+    color: #aaa;
+    font-style: italic;
+}
+.editable-label {
+    font-size: 12px;
+    color: #24996e;
+    margin: 0 0 0 4px;
+    padding: 2px 7px;
+    background: #e6f5ec;
+    border-radius: 7px;
+    display: inline-block;
+    vertical-align: middle;
+    font-weight: normal;
+}
+.template-clickable-group:hover {
+    transform: translateY(-1.5px);
+}
+.spinner {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+}
+.spinner:after {
+  content: " ";
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid #74c97f;
+  border-color: #74c97f transparent #74c97f transparent;
+  animation: spinner-anim 1.2s linear infinite;
+}
+@keyframes spinner-anim {
+  0% { transform: rotate(0deg);}
+  100% { transform: rotate(360deg);}
+}
+    `);
+
+        const TEMPLATE_URL = 'http://tk2-217-18298.vs.sakura.ne.jp/issues/406132';
+
+        let templates = [];
+        let templatesLoaded = false;
+        let loadingError = "";
+        let currentPopupDiv = null;
+
+        function parseTemplatesFromText(rawText) {
+            const blocks = rawText.split(/-{3,}/).map(s => s.trim()).filter(Boolean);
+            const result = [];
+
+            for (const block of blocks) {
+                const titleMatch = block.match(/^タイトル：([^\r\n]+)/m);
+                const editMatch = block.match(/^編集：(可能|不可)/m);
+                const bodyMatch = block.match(/^本文：([\s\S]*)$/m);
+
+                const titleText = titleMatch ? titleMatch[1].trim() : '';
+                const editable = editMatch ? (editMatch[1] === '可能') : false;
+
+                let body = '';
+                if (bodyMatch) {
+                    body = bodyMatch[1].trim();
+                } else {
+                    body = '';
+                }
+
+                if (body === '無し') {
+                    body = '';
+                } else {
+                    body = body.trim();
+                }
+
+                if (!titleText) continue;
+
+                result.push({
+                    titleText: titleText,
+                    fullText: body,
+                    editable: editable,
+                    body: body
+                });
+            }
+            return result;
+        }
+
+        function fetchTemplates(url, callback) {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: url,
+                timeout: 10000,
+                onload: function(response) {
+                    try {
+                        const finalUrl = response.finalUrl || response.responseURL || url;
+                        if (finalUrl.includes('/login')) {
+                            loadingError = "[認証エラー] Redmine未ログインのためテンプレート取得不可です。ログインしてください。";
+                            return callback([]);
+                        }
+                        if (response.status !== 200) {
+                            loadingError = `[エラー] ステータス: ${response.status} で取得失敗`;
+                            return callback([]);
+                        }
+                        if (!response.responseText) {
+                            loadingError = "[エラー] ページ内容が空です。";
+                            return callback([]);
+                        }
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(response.responseText, 'text/html');
+                        if (!doc) {
+                            loadingError = "[エラー] DOMパース失敗。";
+                            return callback([]);
+                        }
+                        const descriptionDiv = doc.querySelector('div.description');
+                        if (!descriptionDiv) {
+                            loadingError = "[エラー] class='description' が見つかりません";
+                            return callback([]);
+                        }
+                        const wikiDiv = descriptionDiv.querySelector('.wiki');
+                        if (!wikiDiv) {
+                            loadingError = "[エラー] class='wiki' が見つかりません（description内）";
+                            return callback([]);
+                        }
+                        let wikiText = wikiDiv.innerHTML
+                        .replace(/<br\s*\/?>/gi, '\n')
+                        .replace(/<\/p>\s*<p>/gi, '\n\n')
+                        .replace(/<p[^>]*>/gi, '')
+                        .replace(/<\/p>/gi, '')
+                        .replace(/<[^>]+>/g, '');
+
+                        const list = parseTemplatesFromText(wikiText);
+                        if(list.length === 0){
+                            loadingError = "[注意] テンプレートが空です。";
+                        }
+                        callback(list);
+                    } catch (e) {
+                        loadingError = "[例外エラー] " + e;
+                        callback([]);
+                    }
+                },
+                onerror: function() {
+                    loadingError = "[通信エラー] 通信エラーでテンプレートを取得できません。";
+                    callback([]);
+                },
+                ontimeout: function() {
+                    loadingError = "[タイムアウト] タイムアウトでテンプレートを取得できません。";
+                    callback([]);
+                }
+            });
+        }
+
+        function createPopupTemplateList(getTargetInput, templates) {
+            let popupDiv = document.getElementById('template-popup');
+            if (popupDiv) popupDiv.remove();
+
+            popupDiv = document.createElement('div');
+            popupDiv.className = 'template-list-popup';
+            popupDiv.id = 'template-popup';
+
+            if (!templatesLoaded && !loadingError) {
+                const loadingDiv = document.createElement('div');
+                loadingDiv.style.display = 'flex';
+                loadingDiv.style.alignItems = 'center';
+                loadingDiv.style.gap = '10px';
+
+                const spinner = document.createElement('span');
+                spinner.className = 'spinner';
+                loadingDiv.appendChild(spinner);
+
+                const loadingText = document.createElement('span');
+                loadingText.textContent = 'テンプレート取得中...';
+                loadingDiv.appendChild(loadingText);
+
+                popupDiv.appendChild(loadingDiv);
+            } else if (loadingError) {
+                popupDiv.textContent = loadingError;
+            } else if (templates.length === 0) {
+                popupDiv.textContent = 'テンプレートが見つかりません';
+            } else {
+                templates.forEach((template, i) => {
+                    const templateDiv = document.createElement('div');
+                    templateDiv.className = 'template-div';
+
+                    const headerRow = document.createElement('div');
+                    headerRow.className = 'template-header-row';
+
+                    const clickableGroup = document.createElement('span');
+                    clickableGroup.style.display = 'inline-flex';
+                    clickableGroup.style.alignItems = 'center';
+                    if (template.fullText) {
+                        clickableGroup.className = 'template-clickable-group';
+                        clickableGroup.style.cursor = 'pointer';
+                    }
+
+                    if (template.fullText) {
+                        const icon = document.createElement('span');
+                        icon.textContent = '🗒️';
+                        icon.style.fontSize = '20px';
+                        icon.style.marginRight = '3px';
+                        icon.style.verticalAlign = 'middle';
+                        clickableGroup.appendChild(icon);
+                    }
+
+                    const titleSpan = document.createElement('span');
+                    titleSpan.className = 'template-title';
+                    titleSpan.textContent = template.titleText;
+                    clickableGroup.appendChild(titleSpan);
+
+                    if (template.fullText && template.editable) {
+                        const editableLabel = document.createElement('span');
+                        editableLabel.className = 'editable-label';
+                        editableLabel.style.marginLeft = '7px';
+                        editableLabel.textContent = '編集可能';
+                        clickableGroup.appendChild(editableLabel);
+                    }
+
+                    if (template.fullText) {
+                        clickableGroup.addEventListener('click', function () {
+                            templateContentDiv.classList.toggle('show');
+                        });
+                    }
+
+                    const pasteButton = document.createElement('button');
+                    pasteButton.type = 'button';
+                    pasteButton.className = 'paste-button-template';
+                    pasteButton.title = '貼り付け';
+                    pasteButton.addEventListener('click', function (event) {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        const targetInput = getTargetInput();
+                        let text = template.fullText ? template.fullText : template.titleText;
+                        if (targetInput) {
+                            if (targetInput.value) targetInput.value += '\n' + text;
+                            else targetInput.value = text;
+                            targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        } else {
+                            alert('id="nouhinsyo_text" の要素が見つかりません');
+                        }
+                        popupDiv.style.display = 'none';
+                    });
+
+                    headerRow.appendChild(clickableGroup);
+                    headerRow.appendChild(pasteButton);
+                    templateDiv.appendChild(headerRow);
+
+                    let templateContentDiv = document.createElement('div');
+                    templateContentDiv.className = 'template-content';
+                    templateContentDiv.style.whiteSpace = 'pre-wrap';
+
+                    if (template.fullText && template.editable) {
+                        const textarea = document.createElement('textarea');
+                        textarea.className = 'editable-textarea';
+                        textarea.value = template.body;
+                        textarea.addEventListener('input', (e) => {
+                            template.fullText = textarea.value;
+                        });
+                        templateContentDiv.appendChild(textarea);
+                    } else if (template.fullText) {
+                        templateContentDiv.textContent = template.fullText;
+                    }
+
+                    popupDiv.appendChild(templateDiv);
+                    if (template.fullText) popupDiv.appendChild(templateContentDiv);
+                });
+
+            }
+
+            document.body.appendChild(popupDiv);
+            return popupDiv;
+        }
+
+        function insertTemplateButton() {
+            const targetTd = Array.from(document.querySelectorAll('td.group_head'))
+            .find(td => td.textContent.includes('納品書特記事項'));
+            if (!targetTd) return;
+            if (targetTd.querySelector('.template-btn')) return;
+
+            targetTd.style.position = "relative";
+
+            const getTargetInput = () => document.getElementById('nouhinsyo_text');
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'template-btn';
+            btn.title = 'テンプレート挿入';
+            btn.innerText = '定型文';
+
+            btn.style.position = "absolute";
+            btn.style.top = "3px";
+            btn.style.right = "0";
+            btn.style.zIndex = "10";
+
+            btn.onclick = e => {
+                e.stopPropagation();
+
+                if (currentPopupDiv && currentPopupDiv.style.display === 'block') {
+                    currentPopupDiv.style.display = 'none';
+                    currentPopupDiv = null;
+                    return;
+                }
+
+                currentPopupDiv = createPopupTemplateList(getTargetInput, templates);
+                currentPopupDiv.style.display = 'block';
+
+                function closePopup(ev) {
+                    if (!currentPopupDiv.contains(ev.target) && ev.target !== btn) {
+                        currentPopupDiv.style.display = 'none';
+                        document.removeEventListener('mousedown', closePopup);
+                        currentPopupDiv = null;
+                    }
+                }
+                setTimeout(() => {
+                    document.addEventListener('mousedown', closePopup);
+                });
+
+                function escClose(ev) {
+                    if (ev.key === 'Escape') {
+                        currentPopupDiv.style.display = 'none';
+                        document.removeEventListener('keydown', escClose);
+                        document.removeEventListener('mousedown', closePopup);
+                        currentPopupDiv = null;
+                    }
+                }
+                document.addEventListener('keydown', escClose);
+            };
+
+            const openLink = targetTd.querySelector('a#nouhinsyo_sw');
+            if (openLink) {
+                openLink.after(btn);
+            } else {
+                targetTd.appendChild(btn);
+            }
+        }
+
+        const getTargetInput = () => document.getElementById('nouhinsyo_text');
+
+        function updatePopupIfOpen() {
+            if (currentPopupDiv && currentPopupDiv.style.display === 'block') {
+                document.removeEventListener('keydown', escClose);
+                const newPopupDiv = createPopupTemplateList(getTargetInput, templates);
+                newPopupDiv.style.display = 'block';
+                currentPopupDiv.replaceWith(newPopupDiv);
+                currentPopupDiv = newPopupDiv;
+
+                function closePopup(ev) {
+                    if (!currentPopupDiv.contains(ev.target)) {
+                        currentPopupDiv.style.display = 'none';
+                        document.removeEventListener('mousedown', closePopup);
+                        document.removeEventListener('keydown', escClose);
+                        currentPopupDiv = null;
+                    }
+                }
+                setTimeout(() => {
+                    document.addEventListener('mousedown', closePopup);
+                });
+
+                function escClose(ev) {
+                    if (ev.key === 'Escape') {
+                        currentPopupDiv.style.display = 'none';
+                        document.removeEventListener('keydown', escClose);
+                        document.removeEventListener('mousedown', closePopup);
+                        currentPopupDiv = null;
+                    }
+                }
+                document.addEventListener('keydown', escClose);
+            }
+        }
+
+        insertTemplateButton();
+
+        fetchTemplates(TEMPLATE_URL, function(list) {
+            templates = list;
+            templatesLoaded = true;
+            updatePopupIfOpen();
+        });
+    }
+
+    function remarksNoteTemplateSupport(){
+
+        GM_addStyle(`
+    *, *::before, *::after {
+    box-sizing: border-box;
+}
+.template2-list-popup {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.template2-content {
+    width: auto;
+}
+.template2-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 17px;
+    width: auto;
+    padding-bottom: 2px;
+    margin-left: 3px;
+    background: #fff;
+    border: 1px solid #bbb;
+    border-radius: 7px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.template2-btn:hover {
+    background: #e5fbe6;
+}
+.template2-list-popup {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 10px 18px 10px 16px;
+    z-index: 10099;
+    position: fixed;
+    top: 18px;
+    right: 24px;
+    width: 600px;
+    max-width: 95vw;
+    max-height: 420px;
+    overflow: auto;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+    display: none;
+    border-radius: 10px;
+    font-size: 13px;
+}
+.template2-div {
+    padding: 7px 0 2px 0;
+    border-top: 1px solid #eee;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6em;
+}
+.template2-div:first-child { border-top: none; }
+.template2-header-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 0.6em;
+}
+
+.title-text-div {flex-grow:1;cursor:pointer;}
+.template2-content {
+    width: 100%;
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: height 0.3s, opacity 0.3s;
+    font-size: 13px;
+    padding-left: 8px;
+    color: #333;
+    margin-top: 2px;
+}
+.template2-content.show {
+    height: auto;
+    opacity: 1;
+    padding: 8px 0 6px 8px;
+}
+.paste-button-template2 {
+    background: #fff;
+    color: #0d7b3e;
+    border: 1px solid #7ed17e;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 15px;
+    width: 25px;
+    height: 25px;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+.paste-button-template2::before { content: '📝'; font-size: 16px; }
+.paste-button-template2:hover { background: #c6f7cb; }
+.editable-textarea {
+    width: 98%;
+    min-height: 125px;
+    font-size: 14px;
+    margin: 0 0 0 0;
+    box-sizing: border-box;
+    resize: vertical;
+    border-radius: 5px;
+    border: 1px solid #d1d6e0;
+    padding: 7px;
+}
+.template2-title {
+    font-weight: bold;
+    font-size: 16px;
+    color: #244c8b;
+    margin-right: 6px;
+    letter-spacing: 0.02em;
+    display: inline-flex;
+    align-items: center;
+}
+.no-content-label2 {
+    color: #aaa;
+    font-style: italic;
+}
+.editable-label2 {
+    font-size: 12px;
+    color: #24996e;
+    margin: 0 0 0 4px;
+    padding: 2px 7px;
+    background: #e6f5ec;
+    border-radius: 7px;
+    display: inline-block;
+    vertical-align: middle;
+    font-weight: normal;
+}
+.template2-clickable-group:hover {
+    transform: translateY(-1.5px);
+}
+.spinner2 {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+}
+.spinner2:after {
+  content: " ";
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid #74c97f;
+  border-color: #74c97f transparent #74c97f transparent;
+  animation: spinner-anim 1.2s linear infinite;
+}
+@keyframes spinner-anim2 {
+  0% { transform: rotate(0deg);}
+  100% { transform: rotate(360deg);}
+}
+    `);
+
+        const TEMPLATE_URL = 'http://tk2-217-18298.vs.sakura.ne.jp/issues/409075';
+
+        let templates = [];
+        let templatesLoaded = false;
+        let loadingError = "";
+        let currentPopupDiv = null;
+
+        function parseTemplatesFromText(rawText) {
+            const blocks = rawText.split(/-{3,}/).map(s => s.trim()).filter(Boolean);
+            const result = [];
+
+            for (const block of blocks) {
+                const titleMatch = block.match(/^タイトル：([^\r\n]+)/m);
+                const editMatch = block.match(/^編集：(可能|不可)/m);
+                const bodyMatch = block.match(/^本文：([\s\S]*)$/m);
+
+                const titleText = titleMatch ? titleMatch[1].trim() : '';
+                const editable = editMatch ? (editMatch[1] === '可能') : false;
+
+                let body = '';
+                if (bodyMatch) {
+                    body = bodyMatch[1].trim();
+                } else {
+                    body = '';
+                }
+
+                if (body === '無し') {
+                    body = '';
+                } else {
+                    body = body.trim();
+                }
+
+                if (!titleText) continue;
+
+                result.push({
+                    titleText: titleText,
+                    fullText: body,
+                    editable: editable,
+                    body: body
+                });
+            }
+            return result;
+        }
+
+        function fetchTemplates(url, callback) {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: url,
+                timeout: 10000,
+                onload: function(response) {
+                    try {
+                        const finalUrl = response.finalUrl || response.responseURL || url;
+                        if (finalUrl.includes('/login')) {
+                            loadingError = "[認証エラー] Redmine未ログインのためテンプレート取得不可です。ログインしてください。";
+                            return callback([]);
+                        }
+                        if (response.status !== 200) {
+                            loadingError = `[エラー] ステータス: ${response.status} で取得失敗`;
+                            return callback([]);
+                        }
+                        if (!response.responseText) {
+                            loadingError = "[エラー] ページ内容が空です。";
+                            return callback([]);
+                        }
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(response.responseText, 'text/html');
+                        if (!doc) {
+                            loadingError = "[エラー] DOMパース失敗。";
+                            return callback([]);
+                        }
+                        const descriptionDiv = doc.querySelector('div.description');
+                        if (!descriptionDiv) {
+                            loadingError = "[エラー] class='description' が見つかりません";
+                            return callback([]);
+                        }
+                        const wikiDiv = descriptionDiv.querySelector('.wiki');
+                        if (!wikiDiv) {
+                            loadingError = "[エラー] class='wiki' が見つかりません（description内）";
+                            return callback([]);
+                        }
+                        let wikiText = wikiDiv.innerHTML
+                        .replace(/<br\s*\/?>/gi, '\n')
+                        .replace(/<\/p>\s*<p>/gi, '\n\n')
+                        .replace(/<p[^>]*>/gi, '')
+                        .replace(/<\/p>/gi, '')
+                        .replace(/<[^>]+>/g, '');
+
+                        const list = parseTemplatesFromText(wikiText);
+                        if(list.length === 0){
+                            loadingError = "[注意] テンプレートが空です。";
+                        }
+                        callback(list);
+                    } catch (e) {
+                        loadingError = "[例外エラー] " + e;
+                        callback([]);
+                    }
+                },
+                onerror: function() {
+                    loadingError = "[通信エラー] 通信エラーでテンプレートを取得できません。";
+                    callback([]);
+                },
+                ontimeout: function() {
+                    loadingError = "[タイムアウト] タイムアウトでテンプレートを取得できません。";
+                    callback([]);
+                }
+            });
+        }
+
+        function createPopupTemplateList(getTargetInput, templates) {
+            let popupDiv = document.getElementById('template2-popup');
+            if (popupDiv) popupDiv.remove();
+
+            popupDiv = document.createElement('div');
+            popupDiv.className = 'template2-list-popup';
+            popupDiv.id = 'template2-popup';
+
+            if (!templatesLoaded && !loadingError) {
+                const loadingDiv = document.createElement('div');
+                loadingDiv.style.display = 'flex';
+                loadingDiv.style.alignItems = 'center';
+                loadingDiv.style.gap = '10px';
+
+                const spinner = document.createElement('span');
+                spinner.className = 'spinner';
+                loadingDiv.appendChild(spinner);
+
+                const loadingText = document.createElement('span');
+                loadingText.textContent = 'テンプレート取得中...';
+                loadingDiv.appendChild(loadingText);
+
+                popupDiv.appendChild(loadingDiv);
+            } else if (loadingError) {
+                popupDiv.textContent = loadingError;
+            } else if (templates.length === 0) {
+                popupDiv.textContent = 'テンプレートが見つかりません';
+            } else {
+                templates.forEach((template, i) => {
+                    const templateDiv = document.createElement('div');
+                    templateDiv.className = 'template2-div';
+
+                    const headerRow = document.createElement('div');
+                    headerRow.className = 'template2-header-row';
+
+                    const clickableGroup = document.createElement('span');
+                    clickableGroup.style.display = 'inline-flex';
+                    clickableGroup.style.alignItems = 'center';
+                    if (template.fullText) {
+                        clickableGroup.className = 'template2-clickable-group';
+                        clickableGroup.style.cursor = 'pointer';
+                    }
+
+                    if (template.fullText) {
+                        const icon = document.createElement('span');
+                        icon.textContent = '🗒️';
+                        icon.style.fontSize = '20px';
+                        icon.style.marginRight = '3px';
+                        icon.style.verticalAlign = 'middle';
+                        clickableGroup.appendChild(icon);
+                    }
+
+                    const titleSpan = document.createElement('span');
+                    titleSpan.className = 'template2-title';
+                    titleSpan.textContent = template.titleText;
+                    clickableGroup.appendChild(titleSpan);
+
+                    if (template.fullText && template.editable) {
+                        const editableLabel = document.createElement('span');
+                        editableLabel.className = 'editable-label2';
+                        editableLabel.style.marginLeft = '7px';
+                        editableLabel.textContent = '編集可能';
+                        clickableGroup.appendChild(editableLabel);
+                    }
+
+                    if (template.fullText) {
+                        clickableGroup.addEventListener('click', function () {
+                            templateContentDiv.classList.toggle('show');
+                        });
+                    }
+
+                    const pasteButton = document.createElement('button');
+                    pasteButton.type = 'button';
+                    pasteButton.className = 'paste-button-template2';
+                    pasteButton.title = '貼り付け';
+                    pasteButton.addEventListener('click', function (event) {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        const targetInput = getTargetInput();
+                        let text = template.fullText ? template.fullText : template.titleText;
+                        if (targetInput) {
+                            if (targetInput.value) targetInput.value += '\n' + text;
+                            else targetInput.value = text;
+                            targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        } else {
+                            alert('id="bikou" の要素が見つかりません');
+                        }
+                        popupDiv.style.display = 'none';
+                    });
+
+                    headerRow.appendChild(clickableGroup);
+                    headerRow.appendChild(pasteButton);
+                    templateDiv.appendChild(headerRow);
+
+                    let templateContentDiv = document.createElement('div');
+                    templateContentDiv.className = 'template2-content';
+                    templateContentDiv.style.whiteSpace = 'pre-wrap';
+
+                    if (template.fullText && template.editable) {
+                        const textarea = document.createElement('textarea');
+                        textarea.className = 'editable-textarea';
+                        textarea.value = template.body;
+                        textarea.addEventListener('input', (e) => {
+                            template.fullText = textarea.value;
+                        });
+                        templateContentDiv.appendChild(textarea);
+                    } else if (template.fullText) {
+                        templateContentDiv.textContent = template.fullText;
+                    }
+
+                    popupDiv.appendChild(templateDiv);
+                    if (template.fullText) popupDiv.appendChild(templateContentDiv);
+                });
+
+            }
+
+            document.body.appendChild(popupDiv);
+            return popupDiv;
+        }
+
+        function insertTemplateButton() {
+            const targetTd = Array.from(document.querySelectorAll('td.group_head'))
+            .find(td => td.textContent.includes('備考'));
+            if (!targetTd) return;
+            if (targetTd.querySelector('.template2-btn')) return;
+
+            targetTd.style.position = "relative";
+
+            const getTargetInput = () => document.getElementById('bikou');
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'template2-btn';
+            btn.title = 'テンプレート挿入';
+            btn.innerText = '定型文';
+
+            btn.style.position = "absolute";
+            btn.style.top = "1px";
+            btn.style.left = "65px";
+            btn.style.zIndex = "10";
+
+            btn.onclick = e => {
+                e.stopPropagation();
+
+                if (currentPopupDiv && currentPopupDiv.style.display === 'block') {
+                    currentPopupDiv.style.display = 'none';
+                    currentPopupDiv = null;
+                    return;
+                }
+
+                currentPopupDiv = createPopupTemplateList(getTargetInput, templates);
+                currentPopupDiv.style.display = 'block';
+
+                function closePopup(ev) {
+                    if (!currentPopupDiv.contains(ev.target) && ev.target !== btn) {
+                        currentPopupDiv.style.display = 'none';
+                        document.removeEventListener('mousedown', closePopup);
+                        currentPopupDiv = null;
+                    }
+                }
+                setTimeout(() => {
+                    document.addEventListener('mousedown', closePopup);
+                });
+
+                function escClose(ev) {
+                    if (ev.key === 'Escape') {
+                        currentPopupDiv.style.display = 'none';
+                        document.removeEventListener('keydown', escClose);
+                        document.removeEventListener('mousedown', closePopup);
+                        currentPopupDiv = null;
+                    }
+                }
+                document.addEventListener('keydown', escClose);
+            };
+
+            const openLink = targetTd.querySelector('a#bikou_sw');
+            if (openLink) {
+                openLink.after(btn);
+            } else {
+                targetTd.appendChild(btn);
+            }
+        }
+
+        const getTargetInput = () => document.getElementById('bikou');
+
+        function updatePopupIfOpen() {
+            if (currentPopupDiv && currentPopupDiv.style.display === 'block') {
+                document.removeEventListener('keydown', escClose);
+                const newPopupDiv = createPopupTemplateList(getTargetInput, templates);
+                newPopupDiv.style.display = 'block';
+                currentPopupDiv.replaceWith(newPopupDiv);
+                currentPopupDiv = newPopupDiv;
+
+                function closePopup(ev) {
+                    if (!currentPopupDiv.contains(ev.target)) {
+                        currentPopupDiv.style.display = 'none';
+                        document.removeEventListener('mousedown', closePopup);
+                        document.removeEventListener('keydown', escClose);
+                        currentPopupDiv = null;
+                    }
+                }
+                setTimeout(() => {
+                    document.addEventListener('mousedown', closePopup);
+                });
+
+                function escClose(ev) {
+                    if (ev.key === 'Escape') {
+                        currentPopupDiv.style.display = 'none';
+                        document.removeEventListener('keydown', escClose);
+                        document.removeEventListener('mousedown', closePopup);
+                        currentPopupDiv = null;
+                    }
+                }
+                document.addEventListener('keydown', escClose);
+            }
+        }
+
+        insertTemplateButton();
+
+        fetchTemplates(TEMPLATE_URL, function(list) {
+            templates = list;
+            templatesLoaded = true;
+            updatePopupIfOpen();
+        });
+    }
+
     runPageScripts();
 
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: df820e145648efc97573e70887ed3647cda7c03835bca5f5e90e3c4eefa58d10
+// @integrity-hash: 42120cb5ad193be2e7789c1827a31bc63d2886d935e0ab45e51a722ba5aa2f11
+
