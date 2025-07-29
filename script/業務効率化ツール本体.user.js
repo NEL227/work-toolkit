@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.7.2
+// @version      1.7.3
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -29,7 +29,7 @@
         "orderStatusCheck", "bulkOrderCheck", "axisReminder", "nonColorSizeReminder",
         "axisCodeErrorCheck", "autoReplaceAxisCode","denpyoUpdateGuard","applyTagStyle","denpyoAutoReflect",
         "jyuchuDateCheck", "freeStockCheck", "autoLogin", "denpyoBunkatsuAutoReflect", "doukonCheck",
-        "deliveryNoteTemplateSupport", "remarksNoteTemplateSupport",
+        "deliveryNoteTemplateSupport", "messageTemplateSupport",
     ];
 
     const settings = {};
@@ -178,7 +178,7 @@ ${createCheckboxAndDetails('autoLogin', '自動ログイン', '楽天系モー�
 ${createCheckboxAndDetails('denpyoBunkatsuAutoReflect', '分割伝票処理自動化', '伝票分割時に元伝票・分割先に伝票番号を作業用欄へ自動反映<br>入荷待ちタグの挿入と確認チェックの自動化<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.4.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
 ${createCheckboxAndDetails('doukonCheck', '同梱チェックサポート', '受注画面で同梱可否を自動判定し、実行操作をサポート<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.5.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
 ${createCheckboxAndDetails('deliveryNoteTemplateSupport', '納品書特記事項 定型文入力補助', '納品書特記事項の横に「定型文」ボタンを追加<br>クリックで定型文の一覧を表示<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.6.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
-${createCheckboxAndDetails('remarksNoteTemplateSupport', '備考 定型文入力補助', '備考の横に「定型文」ボタンを追加<br>クリックで定型文の一覧を表示<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.7.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
+${createCheckboxAndDetails('messageTemplateSupport', 'メッセージ 定型文入力補助', 'メッセージ横に「定型文」ボタンを追加<br>クリックで定型文の一覧を表示<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.7.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
                 </div>
               </details>
             </section>
@@ -556,9 +556,9 @@ ${createCheckboxAndDetails('remarksNoteTemplateSupport', '備考 定型文入力
                     run: deliveryNoteTemplateSupport,
                 },
                 {
-                    name: '備考 定型文入力補助',
-                    isEnabled: () => settings.remarksNoteTemplateSupport,
-                    run: remarksNoteTemplateSupport,
+                    name: 'メッセージ 定型文入力補助',
+                    isEnabled: () => settings.messageTemplateSupport,
+                    run: messageTemplateSupport,
                 },
             ],
         },
@@ -12558,7 +12558,7 @@ transition: all 0.3s ease-in-out;
         });
     }
 
-    function remarksNoteTemplateSupport(){
+    function messageTemplateSupport(){
 
         GM_addStyle(`
     *, *::before, *::after {
@@ -12947,14 +12947,18 @@ transition: all 0.3s ease-in-out;
         }
 
         function insertTemplateButton() {
-            const targetTd = Array.from(document.querySelectorAll('td.group_head'))
-            .find(td => td.textContent.includes('備考'));
+            const targetTds = Array.from(document.querySelectorAll('td.group_head'))
+            .filter(td => td.textContent.includes('メッセージ'));
+
+            if (targetTds.length < 2) return;
+            const targetTd = targetTds[1];
+
             if (!targetTd) return;
             if (targetTd.querySelector('.template2-btn')) return;
 
             targetTd.style.position = "relative";
 
-            const getTargetInput = () => document.getElementById('bikou');
+            const getTargetInput = () => document.getElementById('message');
 
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -12964,7 +12968,7 @@ transition: all 0.3s ease-in-out;
 
             btn.style.position = "absolute";
             btn.style.top = "1px";
-            btn.style.left = "65px";
+            btn.style.left = "75px";
             btn.style.zIndex = "10";
 
             btn.onclick = e => {
@@ -13001,15 +13005,10 @@ transition: all 0.3s ease-in-out;
                 document.addEventListener('keydown', escClose);
             };
 
-            const openLink = targetTd.querySelector('a#bikou_sw');
-            if (openLink) {
-                openLink.after(btn);
-            } else {
-                targetTd.appendChild(btn);
-            }
+            targetTd.appendChild(btn);
         }
 
-        const getTargetInput = () => document.getElementById('bikou');
+        const getTargetInput = () => document.getElementById('message');
 
         function updatePopupIfOpen() {
             if (currentPopupDiv && currentPopupDiv.style.display === 'block') {
@@ -13057,4 +13056,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: 1c22410003b7347b6aecf2b567f9059e2ac268bd35e642844a2c850aea204b23
+// @integrity-hash: c22f905a88d74b33b605e845abf25c38cdae086f85b3e5dd74a6bd99f664bad3
