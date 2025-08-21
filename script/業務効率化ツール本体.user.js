@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.7.3
+// @version      1.8.0
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -21,6 +21,13 @@
 // ==/UserScript==
 
 (async function () {
+
+    // === 本番ログ抑止: =============
+    const DEBUG_LOG = false; // 調査時 true
+    const dbg = DEBUG_LOG ? console.log.bind(console) : () => {};
+    const err = DEBUG_LOG ? console.error.bind(console) : () => {};
+    // ==============================
+
     const settingsKeys = [
         "modifyHelpLinks", "enhanceTitleEditor", "titleInputHelper", "costCalculator",
         "directoryCheck", "setupShipping", "enhanceRemarksEditor", "presetTextHelper",
@@ -29,7 +36,7 @@
         "orderStatusCheck", "bulkOrderCheck", "axisReminder", "nonColorSizeReminder",
         "axisCodeErrorCheck", "autoReplaceAxisCode","denpyoUpdateGuard","applyTagStyle","denpyoAutoReflect",
         "jyuchuDateCheck", "freeStockCheck", "autoLogin", "denpyoBunkatsuAutoReflect", "doukonCheck",
-        "deliveryNoteTemplateSupport", "messageTemplateSupport",
+        "deliveryNoteTemplateSupport", "messageTemplateSupport", "enable1688GuestView",
     ];
 
     const settings = {};
@@ -127,7 +134,7 @@
 
             <section style="margin-bottom: 16px;">
               <details id="listingTeam">
-                <summary style="font-weight: bold; cursor: pointer;">出品チーム用</summary>
+                <summary style="font-weight: bold; cursor: pointer;">出品チーム向け</summary>
                 <div style="padding-left: 20px; margin-top: 10px;">
 ${createCheckboxAndDetails( 'modifyHelpLinks', 'ヘルプリンク更新', 'ヘルプリンクの更新と追加<br><a href="http://tk2-217-18298.vs.sakura.ne.jp/projects/newproducts/wiki/%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8%E3%82%92%E4%BD%BF%E3%81%84%E6%98%93%E3%81%8F%E3%81%99%E3%82%8B#:~:text=%E3%81%A6%E3%81%8F%E3%81%A0%E3%81%95%E3%81%84%E3%80%82-,%E3%83%98%E3%83%AB%E3%83%97%E3%83%AA%E3%83%B3%E3%82%AF%E5%A4%89%E6%9B%B4,-%E4%B8%80%E9%83%A8%E3%83%98%E3%83%AB%E3%83%97%E3%81%AE" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
 ${createCheckboxAndDetails('enhanceTitleEditor', 'タイトルの機能拡張', '入力されている全文をポップアップ表示<br>不要なスペースと重複ワードの検出・削除<br>全角スペースの半角化<br>文字数カウンターを追加<br>ブラウザタブタイトルにコードを記載<br><a href="http://tk2-217-18298.vs.sakura.ne.jp/projects/newproducts/wiki/%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8%E3%82%92%E4%BD%BF%E3%81%84%E6%98%93%E3%81%8F%E3%81%99%E3%82%8B#%E3%82%BF%E3%82%A4%E3%83%88%E3%83%AB%E3%81%AE%E6%94%B9%E8%89%AF" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
@@ -151,13 +158,14 @@ ${createCheckboxAndDetails('orderStatusCheck', '受発注可不可チェック�
 ${createCheckboxAndDetails('bulkOrderCheck', '一括受発注チェック', '条件に基づいてチェックボックスを一括操作<br><a href="http://tk2-217-18298.vs.sakura.ne.jp/projects/newproducts/wiki/%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8%E3%82%92%E4%BD%BF%E3%81%84%E6%98%93%E3%81%8F%E3%81%99%E3%82%8B#%E4%B8%80%E6%8B%AC%E5%8F%97%E7%99%BA%E6%B3%A8%E3%83%81%E3%82%A7%E3%83%83%E3%82%AF" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
 ${createCheckboxAndDetails('axisReminder', '縦横軸設定リマインダー', '受発注チェック画面で縦横軸コード管理に飛ぶ新たなボタンを追加<br><a href="http://tk2-217-18298.vs.sakura.ne.jp/projects/newproducts/wiki/%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8%E3%82%92%E4%BD%BF%E3%81%84%E6%98%93%E3%81%8F%E3%81%99%E3%82%8B#%E7%B8%A6%E6%A8%AA%E8%BB%B8%E8%A8%AD%E5%AE%9A%E3%83%AA%E3%83%9E%E3%82%A4%E3%83%B3%E3%83%80%E3%83%BC" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
 ${createCheckboxAndDetails('nonColorSizeReminder', 'カラーとサイズ以外リマインダー', '項目名をカラーとサイズ以外にした場合、登録後に通知を表示<br><a href="http://tk2-217-18298.vs.sakura.ne.jp/projects/newproducts/wiki/%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8%E3%82%92%E4%BD%BF%E3%81%84%E6%98%93%E3%81%8F%E3%81%99%E3%82%8B#%E3%82%AB%E3%83%A9%E3%83%BC%E3%81%A8%E3%82%B5%E3%82%A4%E3%82%BA%E4%BB%A5%E5%A4%96%E3%83%AA%E3%83%9E%E3%82%A4%E3%83%B3%E3%83%80%E3%83%BC" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
+${createCheckboxAndDetails('enable1688GuestView', '新1688 ログイン制限解除', 'リニューアルされた1688サイトにて、未ログインでも制限なく閲覧できるようにする<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.8.0" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
                 </div>
               </details>
             </section>
 
             <section style="margin-bottom: 16px;">
               <details id="fixTeam">
-                <summary style="font-weight: bold; cursor: pointer;">修正チーム用</summary>
+                <summary style="font-weight: bold; cursor: pointer;">修正チーム向け</summary>
                 <div style="padding-left: 20px; margin-top: 10px;">
 ${createCheckboxAndDetails('axisCodeErrorCheck', '縦横軸コード管理エラーチェック', 'byte数やスペース・記号・機種依存文字を検出<br>いずれかに該当する場合はSKUを追加できないようにする<br><a href="http://tk2-217-18298.vs.sakura.ne.jp/projects/newproducts/wiki/%E4%BF%AE%E6%AD%A3%E3%83%81%E3%83%BC%E3%83%A0%E7%94%A8%E3%83%9E%E3%83%8B%E3%83%A5%E3%82%A2%E3%83%AB#%E6%9C%80%E5%BE%8C%E3%81%AB:~:text=%E2%98%85Websystem%E3%81%8B%E3%82%89SKU%E8%BF%BD%E5%8A%A0%E6%99%82%E3%81%AB%E3%82%A8%E3%83%A9%E3%83%BC%E3%81%8C%E5%87%BA%E3%82%8B%E3%82%88%E3%81%86%E3%81%AB%E3%81%99%E3%82%8B" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
 ${createCheckboxAndDetails('autoReplaceAxisCode', '縦横軸コード管理のコード自動置換', 'SKU追加時に項目名の入力からコードに自動置換<br><a href="http://tk2-217-18298.vs.sakura.ne.jp/projects/newproducts/wiki/%E4%BF%AE%E6%AD%A3%E3%83%81%E3%83%BC%E3%83%A0%E7%94%A8%E3%83%9E%E3%83%8B%E3%83%A5%E3%82%A2%E3%83%AB#%E6%9C%80%E5%BE%8C%E3%81%AB:~:text=%E2%98%85Websystem%E3%81%8B%E3%82%89SKU%E8%BF%BD%E5%8A%A0%E6%99%82%E3%81%AB%E3%82%B3%E3%83%BC%E3%83%89%E8%87%AA%E5%8B%95%E5%A4%89%E6%8F%9B" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
@@ -167,7 +175,7 @@ ${createCheckboxAndDetails('autoReplaceAxisCode', '縦横軸コード管理の�
 
             <section style="margin-bottom: 16px;">
               <details id="conciergeTeam">
-                <summary style="font-weight: bold; cursor: pointer;">コンシェルジュ用</summary>
+                <summary style="font-weight: bold; cursor: pointer;">コンシェルジュ向け</summary>
                 <div style="padding-left: 20px; margin-top: 10px;">
 ${createCheckboxAndDetails('denpyoUpdateGuard', '伝票更新警告機能', '誤操作防止のため納品書印刷済み・印刷待ちの伝票に対して<br>更新前に警告を表示<br><span style="color:#aaa;">※詳しい説明は現在準備中です</span>')}
 ${createCheckboxAndDetails('applyTagStyle', '旧伝票タグ整列', '旧伝票のタグの見た目を整えてトラディショナルのようにする<br>よく使用するものに色を付ける<br>編集でクリックから個別選択解除<br><a href="https://github.com/NEL227/work-toolkit/releases/tag/v1.03.02" target="_blank" style="color:#4baaf5;text-decoration:underline;">詳しい説明はこちら</a>')}
@@ -504,6 +512,11 @@ ${createCheckboxAndDetails('messageTemplateSupport', 'メッセージ 定型文�
                     isEnabled: () => settings.dlMergedImgs,
                     run: dlMergedImgs,
                 },
+                {
+                    name: '新1688 ログイン制限解除',
+                    isEnabled: () => settings.enable1688GuestView,
+                    run: enable1688GuestView,
+                },
             ],
         },
         {
@@ -612,13 +625,13 @@ ${createCheckboxAndDetails('messageTemplateSupport', 'メッセージ 定型文�
         const url = window.location.href;
         for (const page of pageScriptList) {
             if (page.urlPattern.test(url)) {
-                // console.log(`[ページ検出] ${page.pageName}`);
+                // dbg(`[ページ検出] ${page.pageName}`);
                 page.scripts.forEach(script => {
                     if (script.isEnabled()) {
-                        // console.log(`実行: ${script.name}`);
+                        // dbg(`実行: ${script.name}`);
                         script.run();
                     } else {
-                        // console.log(`無効: ${script.name}`);
+                        // dbg(`無効: ${script.name}`);
                     }
                 });
                 break;
@@ -1807,14 +1820,14 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                                 .then(response => response.json())
                                 .then(data => {
                                 saveToIndexedDB(data)
-                                    .catch(error => console.error('データの保存中にエラーが発生しました:', error));
+                                    .catch(error => err('データの保存中にエラーが発生しました:', error));
 
                                 callback(data);
                             })
-                                .catch(error => console.error('JSONデータの取得中にエラーが発生しました:', error));
+                                .catch(error => err('JSONデータの取得中にエラーが発生しました:', error));
                         }
                     })
-                        .catch(error => console.error('IndexedDBからのデータ取得中にエラーが発生しました:', error));
+                        .catch(error => err('IndexedDBからのデータ取得中にエラーが発生しました:', error));
                 }
 
                 function handleData(data) {
@@ -2242,12 +2255,12 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                                 const existingContent = data.content;
                                 callback(sha, existingContent);
                             } else {
-                                console.error("ファイルの取得に失敗しました:", response.responseText);
+                                err("ファイルの取得に失敗しました:", response.responseText);
                                 callback(null, null);
                             }
                         },
                         onerror: function(error) {
-                            console.error("エラーが発生しました:", error);
+                            err("エラーが発生しました:", error);
                             callback(null, null);
                         }
                     });
@@ -2278,11 +2291,11 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                                             console.warn("競合確認...リトライ中");
                                             setTimeout(() => uploadData(retryCount + 1), 1000);
                                         } else {
-                                            console.error("データ送信失敗:", response.responseText);
+                                            err("データ送信失敗:", response.responseText);
                                         }
                                     },
                                     onerror: function(error) {
-                                        console.error("Error:", error);
+                                        err("Error:", error);
                                         if (retryCount < 3) {
                                             setTimeout(() => uploadData(retryCount + 1), 1000);
                                         }
@@ -2331,7 +2344,7 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                 result = new Function(`return ${scaledExpr}`)() / scale;
                 result = Math.round(result * 100) / 100;
             } catch (e) {
-                console.error('式の評価に失敗:', e);
+                err('式の評価に失敗:', e);
             }
 
             return result;
@@ -2523,7 +2536,7 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                     resolve(event.target.result);
                 };
                 request.onerror = function(event) {
-                    console.error('IndexedDBエラー: ' + event.target.errorCode);
+                    err('IndexedDBエラー: ' + event.target.errorCode);
                     reject('IndexedDBエラー: ' + event.target.errorCode);
                 };
             });
@@ -2538,7 +2551,7 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                     resolve(event.target.result);
                 };
                 request.onerror = function(event) {
-                    console.error('IndexedDBからデータ取得中にエラーが発生しました');
+                    err('IndexedDBからデータ取得中にエラーが発生しました');
                     reject('IndexedDBからデータ取得中にエラーが発生しました');
                 };
             });
@@ -2557,49 +2570,47 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                     resolve();
                 };
                 request.onerror = (event) => {
-                    console.error('IndexedDB保存失敗', event.target.error);
+                    err('IndexedDB保存失敗', event.target.error);
                     reject(event.target.error);
                 };
                 transaction.onerror = (event) => {
-                    console.error('IndexedDBトランザクションエラー', event.target.error);
+                    err('IndexedDBトランザクションエラー', event.target.error);
                     reject(event.target.error);
                 };
             });
         };
 
-        const needsUpdate = (lastUpdated) => {
-            const now = Date.now();
-            let lastUpdatedDate;
-            if (typeof lastUpdated === "number") {
-                lastUpdatedDate = new Date(lastUpdated);
-            } else if (typeof lastUpdated === "string") {
-                lastUpdatedDate = new Date(lastUpdated.replace(/\//g, "-"));
-            } else {
-                return true;
-            }
-            if (isNaN(lastUpdatedDate.getTime())) return true;
+        const needsUpdate = (record) => {
+            const fetchedAt = record?.fetchedAt ?? record?.lastUpdated ?? null;
+            if (!fetchedAt) return true;
 
-            const oneWeek = 7 * 24 * 60 * 60 * 1000;
-            const lastUpdateDay = lastUpdatedDate.getDay();
-            const currentDay = new Date().getDay();
+            const d = new Date(typeof fetchedAt === 'number' ? fetchedAt : String(fetchedAt).replace(/\//g, '-'));
+            if (isNaN(d.getTime())) return true;
 
-            if (now - lastUpdatedDate.getTime() > oneWeek) return true;
-            if (lastUpdateDay !== 1 && currentDay === 1) return true;
-            return false;
+            const now = new Date();
+            const toDateKey = (dt) => `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,'0')}-${dt.getDate().toString().padStart(2,'0')}`;
+            return toDateKey(d) !== toDateKey(now);
         };
 
-        const fetchAndUpdateData = async (db) => {
+        const fetchAndUpdateData = async (db, fallbackData) => {
             try {
-                const response = await fetch('https://nel227.github.io/work-toolkit/directories.json');
+                const response = await fetch('https://nel227.github.io/work-toolkit/directories.json', { cache: 'no-cache' });
                 const data = await response.json();
 
-                const lastUpdated = Date.now();
+                const sourceLastUpdated = typeof data.lastUpdated === 'string' ? data.lastUpdated : '';
 
-                await saveDataToIndexedDB(db, { data, lastUpdated });
-                return { data, lastUpdated };
+                const payload = {
+                    data,
+                    sourceLastUpdated,
+                    fetchedAt: Date.now(),
+                    id: 'directoryData'
+                };
+
+                await saveDataToIndexedDB(db, payload);
+                return payload;
             } catch (error) {
-                console.error("データの取得または保存中にエラーが発生しました:", error);
-                return null;
+                err("新しいデータの取得に失敗しました。以前のデータを使用します:", error);
+                return fallbackData || null;
             }
         };
 
@@ -2608,26 +2619,23 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
                 const db = await openIndexedDB();
                 let directoryData = await getDataFromIndexedDB(db);
 
-                const lastUpdated = directoryData && directoryData.lastUpdated;
-
-                if (!directoryData || needsUpdate(directoryData.lastUpdated)) {
-                    directoryData = await fetchAndUpdateData(db);
+                if (!directoryData || needsUpdate(directoryData)) {
+                    directoryData = await fetchAndUpdateData(db, directoryData);
                 }
 
                 if (directoryData && directoryData.data) {
                     const yahooDirectory = directoryData.data.YahooDirectory || {};
                     const neDirectory = directoryData.data.NEDirectory || {};
-
                     addInputListener(targetInputSelector1, yahooDirectory, popup1, contentDiv1);
                     addInputListener(targetInputSelector2, neDirectory, popup2, contentDiv2);
                 } else {
-                    console.error('データが正しく取得されませんでした。デフォルトの空データを使用します。');
+                    err('有効なデータがありません。デフォルトの空データを使用します。');
                     const emptyData = {};
                     addInputListener(targetInputSelector1, emptyData, popup1, contentDiv1);
                     addInputListener(targetInputSelector2, emptyData, popup2, contentDiv2);
                 }
             } catch (error) {
-                console.error('データの取得中にエラーが発生しました:', error);
+                err('fetchData全体でエラーが発生しました:', error);
             }
         };
 
@@ -2971,28 +2979,34 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
 
             const tooltip = document.createElement('div');
             tooltip.setAttribute('style', `
-        position: absolute;
-        background: #333;
-        color: #fff;
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-size: 12px;
-        display: none;
-        z-index: 10002;
-    `);
+    position: absolute;
+    background: #333;
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    display: none;
+    z-index: 10002;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  `);
 
-            const lastUpdated = directoryData && directoryData.lastUpdated
-            ? new Date(directoryData.lastUpdated).toLocaleString("ja-JP", {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            })
-            : 'データなし';
+            const getSrcLUText = (data) => data?.sourceLastUpdated || data?.data?.lastUpdated || 'データなし';
 
-            tooltip.textContent = `ディレクトリ最終更新日時: ${lastUpdated}`;
-
+            tooltip.innerHTML = `
+    <div style="margin-bottom:6px;">
+      ディレクトリ最終更新日時:
+      <span id="dir-src-lu">${getSrcLUText(directoryData)}</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button id="dir-refresh-btn"
+        style="
+          background:#0d6efd; color:#fff; border:none; border-radius:4px;
+          padding:4px 8px; cursor:pointer; font-size:12px;
+        "
+      >最新データ取得</button>
+      <span id="dir-refresh-status" style="font-size:12px; color:#ccc;"></span>
+    </div>
+  `;
             document.body.appendChild(tooltip);
 
             lastUpdatedElement.textContent = '？';
@@ -3003,7 +3017,7 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
             lastUpdatedElement.style.height = 'auto';
             lastUpdatedElement.style.padding = '0';
 
-            lastUpdatedElement.addEventListener('click', (event) => {
+            lastUpdatedElement.addEventListener('click', () => {
                 const rect = lastUpdatedElement.getBoundingClientRect();
                 tooltip.style.top = `${rect.bottom + window.scrollY}px`;
                 tooltip.style.left = `${rect.left + window.scrollX}px`;
@@ -3013,6 +3027,54 @@ td[colspan="3"]:has(input[name="data[TbMainproduct][daihyo_syohin_name]"]) {
             document.addEventListener('click', (event) => {
                 if (!lastUpdatedElement.contains(event.target) && !tooltip.contains(event.target)) {
                     tooltip.style.display = 'none';
+                }
+            });
+
+            const refreshBtn = tooltip.querySelector('#dir-refresh-btn');
+            const statusEl = tooltip.querySelector('#dir-refresh-status');
+            const luEl = tooltip.querySelector('#dir-src-lu');
+
+            refreshBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                dbg('[Directory] 手動更新を開始します…');
+                const originalText = refreshBtn.textContent;
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '取得中…';
+                statusEl.textContent = '';
+
+                const before = await getDataFromIndexedDB(db);
+                const beforeSLU = (before?.sourceLastUpdated || before?.data?.lastUpdated || '').trim();
+
+                const result = await fetchAndUpdateData(db, before);
+                if (result && result.data) {
+                    const afterSLU = (result?.sourceLastUpdated || result?.data?.lastUpdated || '').trim();
+
+                    if (beforeSLU && afterSLU && beforeSLU === afterSLU) {
+                        dbg('[Directory] ソース最終更新は同一のため、更新なし:', afterSLU);
+                        statusEl.textContent = '更新はありません（最新です）';
+                        alert('更新はありません（最新のデータが反映済みです）');
+                        refreshBtn.disabled = false;
+                        refreshBtn.textContent = originalText;
+                        return;
+                    }
+
+                    luEl.textContent = afterSLU || 'データなし';
+                    dbg('[Directory] 手動更新に成功しました。sourceLastUpdated =', luEl.textContent);
+
+                    refreshBtn.disabled = false;
+                    refreshBtn.textContent = originalText;
+
+                    if (confirm('最新のディレクトリを取得しました。ページを再読み込みしますか？')) {
+                        location.reload();
+                    } else {
+                        alert('最新データの反映にはページの再読み込みが必要です。');
+                    }
+                } else {
+                    err('[Directory] 手動更新に失敗しました。前回のデータを継続利用します。');
+                    statusEl.textContent = '取得に失敗しました';
+                    alert('取得に失敗しました。前回のデータを継続利用します。');
+                    refreshBtn.disabled = false;
+                    refreshBtn.textContent = originalText;
                 }
             });
         };
@@ -3291,7 +3353,7 @@ ${filteredYahooResults.length > 0 && yahooCheckbox && yahooCheckbox.checked ? `
                     searchResults.innerHTML = '<div>データが正しく取得されませんでした。</div>';
                 }
             } catch (error) {
-                console.error('検索中にエラーが発生しました:', error);
+                err('検索中にエラーが発生しました:', error);
             }
         };
 
@@ -3526,7 +3588,7 @@ transition: all 0.3s ease-in-out;
                 result = Math.ceil(result * 100) / 100;
 
             } catch (error) {
-                console.error('無効な式です:', error);
+                err('無効な式です:', error);
             }
             return result;
         }
@@ -3637,7 +3699,7 @@ transition: all 0.3s ease-in-out;
             openDatabase().then(() => {
                 initialize();
             }).catch(error => {
-                console.error(error);
+                err(error);
             });
         }
 
@@ -5797,7 +5859,7 @@ transition: all 0.3s ease-in-out;
                 pasteEvent.clipboardData.setData('text', text);
                 inputElement.dispatchEvent(pasteEvent);
             }).catch(err => {
-                console.error('Clipboardへの書き込みに失敗しました:', err);
+                err('Clipboardへの書き込みに失敗しました:', err);
             });
         }
 
@@ -5884,7 +5946,7 @@ transition: all 0.3s ease-in-out;
                         copyButton.textContent = 'コピー';
                     }, 1500);
                 }).catch(err => {
-                    console.error('コピーに失敗しました: ', err);
+                    err('コピーに失敗しました: ', err);
                 });
             });
 
@@ -6723,7 +6785,7 @@ transition: all 0.3s ease-in-out;
                         const image = await loadImage(imgUrl);
                         loadedImages.push(image);
                     } catch (err) {
-                        console.error('画像のロードに失敗:', imgUrl, err);
+                        err('画像のロードに失敗:', imgUrl, err);
                     }
                 }
             }
@@ -11231,7 +11293,7 @@ transition: all 0.3s ease-in-out;
 
         function showStatus(msg, level = "info") {
             if (level === "error") {
-                console.error(msg);
+                err(msg);
             } else if (level === "warn") {
                 console.warn(msg);
             }
@@ -13051,9 +13113,92 @@ transition: all 0.3s ease-in-out;
         });
     }
 
+    function enable1688GuestView(){
+
+        const STYLE_ID = 'tm-1688-guest-style';
+
+        function isGuest() {
+            const s = document.getElementById('submitOrder');
+            return !!(s && s.classList.contains('not-login'));
+        }
+
+        function ensureStyle() {
+            if (document.getElementById(STYLE_ID)) return;
+            const s = document.createElement('style');
+            s.id = STYLE_ID;
+            s.textContent = `
+      /* ゲスト時だけON */
+      :root[data-tm-guest="1"] #submitOrder { display: none !important; }
+      :root[data-tm-guest="1"] .module-login-bar.v-flex.center { display: none !important; }
+      :root[data-tm-guest="1"] .collapse-footer { display: none !important; }
+
+      :root[data-tm-guest="1"] [class*="collapse"],
+      :root[data-tm-guest="1"] .od-collapse-module {
+        max-height: none !important;
+        overflow: visible !important;
+      }
+
+      :root[data-tm-guest="1"] .module-od-cart-sider .cart-sider {
+        --module-side-cart-width: calc(100% - 20px);
+      }
+
+      /* 未ログイン専用のSKU制限を無効化 */
+      :root[data-tm-guest="1"] .module-od-sku-selection.od-sku-selection-not-login {
+        height: auto !important;
+        overflow: visible !important;
+        max-height: none !important;
+      }
+
+      /* 商品説明の重なり対策 */
+      :root[data-tm-guest="1"] .module-od-product-description .html-description {
+        position: relative; z-index: 1;
+      }
+    `;
+            document.head.appendChild(s);
+        }
+
+        function applyMode() {
+            ensureStyle();
+            const root = document.documentElement;
+            if (isGuest()) {
+                root.setAttribute('data-tm-guest', '1');
+            } else {
+                root.removeAttribute('data-tm-guest'); // ログイン時はOFF
+            }
+        }
+
+        // 変化をまとめて処理
+        const scheduleApply = (() => {
+            let raf = 0;
+            return () => {
+                cancelAnimationFrame(raf);
+                raf = requestAnimationFrame(applyMode);
+            };
+        })();
+
+        function boot() {
+            applyMode();
+            const mo = new MutationObserver(scheduleApply);
+            mo.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class']
+            });
+            window.addEventListener('hashchange', scheduleApply, { passive: true });
+            window.addEventListener('popstate', scheduleApply, { passive: true });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', boot);
+        } else {
+            boot();
+        }
+    }
+
     runPageScripts();
 
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: c22f905a88d74b33b605e845abf25c38cdae086f85b3e5dd74a6bd99f664bad3
+// @integrity-hash: e957c19be8cff8ea69c7341e668b20345ba0981f6848841743957743f08ae9e9
