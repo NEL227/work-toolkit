@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.8.0
+// @version      1.8.1
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -13132,12 +13132,6 @@ transition: all 0.3s ease-in-out;
       :root[data-tm-guest="1"] .module-login-bar.v-flex.center { display: none !important; }
       :root[data-tm-guest="1"] .collapse-footer { display: none !important; }
 
-      :root[data-tm-guest="1"] [class*="collapse"],
-      :root[data-tm-guest="1"] .od-collapse-module {
-        max-height: none !important;
-        overflow: visible !important;
-      }
-
       :root[data-tm-guest="1"] .module-od-cart-sider .cart-sider {
         --module-side-cart-width: calc(100% - 20px);
       }
@@ -13149,10 +13143,14 @@ transition: all 0.3s ease-in-out;
         max-height: none !important;
       }
 
-      /* 商品説明の重なり対策 */
-      :root[data-tm-guest="1"] .module-od-product-description .html-description {
-        position: relative; z-index: 1;
-      }
+      /* 画像ブロックの折りたたみ解除 */
+      :root[data-tm-guest="1"] .antd-external-collapse.collapse-body,
+      :root[data-tm-guest="1"] #description .collapse-body {
+        height: auto !important;
+        max-height: none !important;
+       overflow-y: visible !important;
+       overflow: visible !important;
+     }
     `;
             document.head.appendChild(s);
         }
@@ -13201,4 +13199,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: e957c19be8cff8ea69c7341e668b20345ba0981f6848841743957743f08ae9e9
+// @integrity-hash: a3141dc0ded3818492bb22f92ba4e0b1854b1be86d9d05655b10e21e8c2fa3fc
