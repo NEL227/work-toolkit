@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.8.1
+// @version      1.8.2
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -9264,7 +9264,9 @@ transition: all 0.3s ease-in-out;
 
         function detectSaveButtons() {
             const buttons = document.querySelectorAll('div.row10.mb10 button.btn.btn-primary');
-            saveButton = Array.from(buttons).find(btn => btn.textContent.includes('項目名保存')) || null;
+            saveButton = Array.from(buttons).find(btn =>
+                btn.textContent.includes('項目名保存') || btn.textContent === '保存'
+            ) || null;
 
             modalSaveButtons = Array.from(document.querySelectorAll('div.modal-footer button.btn-primary'))
                 .filter(btn => btn.textContent.includes('保存'));
@@ -13199,4 +13201,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: a3141dc0ded3818492bb22f92ba4e0b1854b1be86d9d05655b10e21e8c2fa3fc
+// @integrity-hash: bd7604b098d319604a81805561a3e0bc605744648294f0f128fb89a4a557466c
