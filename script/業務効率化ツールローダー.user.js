@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツールローダー
 // @namespace    http://tampermonkey.net/
-// @version      1.2.1
+// @version      1.2.2
 // @description  業務支援ツールを自動で取得・更新するローダースクリプト
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -17,6 +17,7 @@
 // @connect      raw.githubusercontent.com
 // @connect      work-toolkit.vercel.app
 // @connect      tk2-217-18298.vs.sakura.ne.jp
+// @connect      starlight.plusnao.co.jp
 // @run-at       document-end
 // @updateURL    https://raw.githubusercontent.com/NEL227/work-toolkit/main/script/業務効率化ツールローダー.user.js
 // @downloadURL  https://raw.githubusercontent.com/NEL227/work-toolkit/main/script/業務効率化ツールローダー.user.js
