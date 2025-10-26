@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.8.2
+// @version      1.9.0
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -14,6 +14,7 @@
 // @grant        GM_xmlhttpRequest
 // @run-at       document-end
 // @connect      plus-nao.com
+// @connect      starlight.plusnao.co.jp
 // @connect      work-toolkit.vercel.app
 // @connect      tk2-217-18298.vs.sakura.ne.jp
 // @updateURL    https://raw.githubusercontent.com/NEL227/work-toolkit/main/script/%E6%A5%AD%E5%8B%99%E5%8A%B9%E7%8E%87%E5%8C%96%E3%83%84%E3%83%BC%E3%83%AB%E6%9C%AC%E4%BD%93.user.js
@@ -4960,763 +4961,480 @@ transition: all 0.3s ease-in-out;
 
     function copyMakerStockTable(){
 
+        const SELECTOR_VARIANTS = [
+            {
+                name: 'selector-table-adv',
+                detect: () => {
+                    const root = document.querySelector('.selector-table');
+                    if (!root) return false;
+                    const header = root.querySelector('.next-table-header-inner thead tr');
+                    const body = root.querySelector('.next-table-body tbody');
+                    return !!(header && body);
+                },
+                skuSection: '.selector-table .next-table-header-inner thead tr th',
+                groupTitle: '', // 特殊処理で取得
+                labelNames: '', // 未使用
+                itemTitles: '' // 未使用
+            },
+            {
+                name: 'classic',
+                detect: () => document.querySelector('#skuSelection .feature-item'),
+                skuSection: '#skuSelection .feature-item',
+                groupTitle: 'h3',
+                labelNames: '.transverse-filter .label-name',
+                itemTitles: '.expand-view-item .item-label[title]'
+            },
+            {
+                name: 'pc-sku-wrapper',
+                detect: () => document.querySelector('.pc-sku-wrapper .sku-module-wrapper'),
+                skuSection: '.pc-sku-wrapper .sku-module-wrapper',
+                groupTitle: '.sku-prop-module-name',
+                labelNames: '.prop-name[title], .sku-item-name',
+                itemTitles: ''
+            },
+            {
+                name: 'gyp-sku-selector',
+                detect: () => document.querySelector('.gyp-sku-selector-wrap .sku-selector-flex-box'),
+                skuSection: '.gyp-sku-selector-wrap .sku-selector-flex-box',
+                groupTitle: '.sku-selector-name',
+                labelNames: '.prop-item-text, .sku-item-name-text',
+                itemTitles: ''
+            },
+            {
+                name: 'table-sku',
+                detect: () => document.querySelector('.next-table .next-table-body'),
+                skuSection: '.next-table .next-table-body tbody tr',
+                groupTitle: '',
+                labelNames: 'td .normal-text[title]',
+                itemTitles: ''
+            },
+            {
+                name: 'next-table-header',
+                detect: () => document.querySelector('.next-table-header-inner thead tr'),
+                skuSection: '.next-table-header-inner thead tr th',
+                groupTitle: '',
+                labelNames: '.label-content[title]',
+                itemTitles: ''
+            }
+        ];
+
+        let SELECTOR = null;
+        let cleanupProximity = null;
+
         GM_addStyle(`
-    .copyButton {
-        position: fixed;
-        right: 10px;
-        z-index: 1000;
-        background-color: #007bff;
-        color: white;
-        border: none;
-        padding: 10px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-family: Arial, sans-serif;
-        margin-bottom: 5px;
-    }
-    .concatButton {
-        background-color: gray !important;
-        color: white;
-        padding: 5px 8px;
-        border: none;
-        border-radius: 3px;
-        cursor: pointer;
-        font-family: Arial, sans-serif;
-    }
-    .concatButton.active {
-        background-color: orange !important;
-    }
-    .checkboxList {
-        position: fixed;
-        top: 30px;
-        right: 10px;
-        background-color: white;
-        border: 1px solid #ccc;
-        padding: 20px;
-        max-height: 90vh;
-        overflow-y: auto;
-        z-index: 2000;
-        font-size: 15px;
-        min-width: 230px;
-    }
-    .checkboxList button {
-        margin-top: 10px;
-        background-color: #28a745;
-        color: white;
-        padding: 5px 8px;
-        border: none;
-        border-radius: 3px;
-        cursor: pointer;
-    }
-    .checkboxList .cancelButton {
-        background-color: #dc3545;
+  .copyButtonsContainer {
+    position: fixed; top: 20px; right: 10px; z-index: 1000;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+    transition: opacity .18s ease, transform .18s ease;
+    opacity: .08; transform: translateY(-2px); pointer-events: none;
+  }
+  .copyButtonsContainer.visible, .copyButtonsContainer.pinned { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .copyButtonsContainer.hidden { display: none !important; }
 
-        font-family: Arial, sans-serif;
-    }
-    .checkboxList label {
-        display: block;
-        margin-bottom: 5px;
-        white-space: nowrap;
-    }
-    .button-container {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 15px;
-        position: sticky;
-        bottom: -20px;
-        background-color: white;
-        padding: 10px 0;
-        border-top: 1px solid #ccc;
-    }
-    .selectButton {
-        background-color: #007bff !important;
-        color: white !important;
-        padding: 5px 8px;
-        border: none;
-        border-radius: 3px;
-        cursor: pointer;
-        font-family: Arial, sans-serif;
-    }
-    .ok-cancel-container {
-        display: flex;
-        justify-content: flex-end;
-    }
-`);
+  .copyButtonsContainer .copyButton {
+    background-color: #007bff; color: #fff; border: none; padding: 9px 10px;
+    border-radius: 6px; cursor: pointer; font: 12px/1 Arial, sans-serif;
+    white-space: nowrap; width: max-content; box-shadow: 0 2px 6px rgba(0,0,0,.12);
+                box-shadow: 0 4px 6px rgba(0,0,0,.12);
 
-        let isConcatMode = false;
+  }
+  .copyButtonsContainer .masterCopyButton { background-color: #228d3a !important; }
 
-        function toggleConcatMode(button) {
-            isConcatMode = !isConcatMode;
-            button.classList.toggle('active', isConcatMode);
+  .copyButtonsContainer .row { display: flex; gap: 6px; align-items: center; width: 100%; justify-content: flex-end; }
+  .copyButtonsContainer .pinToggle,
+  .copyButtonsContainer .hideToggle {
+    font: 12px/1 Arial, sans-serif; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid #ddd; background: #fff; cursor: pointer;
+  }
+
+  .reopenHandle {
+    position: fixed; top: 20px; right: -2px; z-index: 1001;
+    padding: 6px 10px 6px 12px; font: 12px/1 Arial, sans-serif;
+    color: #fff; background: rgba(102,102,102,.9);
+    border-radius: 6px 0 0 6px; cursor: pointer; opacity: .6;
+    box-shadow: 0 2px 6px rgba(0,0,0,.12); user-select: none;
+  }
+  .reopenHandle:hover { opacity: 1; right: 0; }
+
+  .checkboxList {
+    position: fixed; top: 30px; right: 10px; background-color: white; border: 1px solid #ccc;
+    padding: 20px 15px 15px 15px; max-height: 90vh; overflow-y: auto; z-index: 2000;
+    font-size: 15px; min-width: 230px; box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  }
+  .checkboxList label { display: block; white-space: nowrap; }
+  .button-container {
+    display: flex; justify-content: space-between; align-items: center; position: sticky; bottom: -15px;
+    background-color: white; padding-top: 10px; padding-bottom: 10px; border-top: 1px solid #ccc; gap: 10px;
+  }
+  .selectToggleButton, .okButton, .closeButton {
+    background-color: #007bff !important; color: white !important; padding: 5px 8px;
+    border: none; border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif;
+  }
+  .closeButton { background-color: #dc3545 !important; }
+  `);
+
+        function textFromCell(cell) {
+            const t = cell?.querySelector('.normal-text[title]')?.getAttribute('title')?.trim();
+            if (t) return t;
+            const p = cell?.querySelector('.price')?.textContent?.trim();
+            if (p) return p;
+            const raw = cell?.textContent?.trim();
+            return raw || '';
         }
 
-        function showCheckboxList(columnTexts, callback) {
-            let existingList = document.querySelector('.checkboxList');
-            if (existingList) {
-                document.body.removeChild(existingList);
-            }
+        function getHeaderColIndex(th) {
+            const w = th.querySelector('.next-table-cell-wrapper[data-next-table-col]');
+            if (w && w.getAttribute('data-next-table-col')) return parseInt(w.getAttribute('data-next-table-col'), 10);
+            const tr = th.closest('tr');
+            const ths = tr ? Array.from(tr.children) : [];
+            return Math.max(0, ths.indexOf(th));
+        }
 
-            const longestTextLength = Math.max(...columnTexts.map(text => text.length));
-            const listWidth = Math.max(200, Math.min(600, longestTextLength * 21));
+        function getNearestTableInner(el) {
+            return el.closest('.next-table-inner') || document.querySelector('.selector-table .next-table-inner');
+        }
+
+        function collectFromTableColumn(th) {
+            const col = getHeaderColIndex(th);
+            const inner = getNearestTableInner(th);
+            const rows = inner?.querySelectorAll('.next-table-body tbody tr') || [];
+            const set = new Set();
+            rows.forEach(row => {
+                const td = row.querySelector(`td[data-next-table-col="${col}"] .next-table-cell-wrapper`) ||
+                      row.querySelector(`td[data-next-table-col="${col}"]`);
+                const v = textFromCell(td);
+                if (v) set.add(v);
+            });
+            return Array.from(set);
+        }
+
+        function headerText(th) {
+            const price = th.querySelector('.price-title');
+            if (price) return '价格';
+            const span = th.querySelector('.label-content[title]');
+            if (span?.getAttribute('title')) return span.getAttribute('title').trim();
+            return th.textContent.trim();
+        }
+
+        function isSkuHeaderCell(th) {
+            if (th.querySelector('.price-title')) return false;
+            const t = headerText(th);
+            if (!t) return false;
+            const banned = ['价格', '库存', '进货数量'];
+            return !banned.some(b => t.includes(b));
+        }
+
+        function collectTitlesFromFeatureItem(item) {
+            if (SELECTOR?.name === 'selector-table-adv') {
+                return collectFromTableColumn(item);
+            }
+            const titles = new Set();
+            if (SELECTOR?.labelNames) {
+                item.querySelectorAll(SELECTOR.labelNames).forEach(el => {
+                    const text = el.getAttribute('title')?.trim() || el.textContent.trim();
+                    if (text) titles.add(text);
+                });
+            }
+            if (SELECTOR?.itemTitles) {
+                item.querySelectorAll(SELECTOR.itemTitles).forEach(el => {
+                    const text = el.getAttribute('title')?.trim();
+                    if (text) titles.add(text);
+                });
+            }
+            return Array.from(titles);
+        }
+
+        function getFeatureTitle(item, index = 0) {
+            if (SELECTOR?.name === 'selector-table-adv') {
+                return headerText(item) || `列 ${index + 1}`;
+            }
+            if (SELECTOR?.name === 'table-sku' || SELECTOR?.name === 'next-table-header') {
+                const span = item.querySelector('.label-content[title]');
+                return span?.getAttribute('title')?.trim() || item.textContent.trim() || `列 ${index + 1}`;
+            }
+            const el = item.querySelector(SELECTOR?.groupTitle);
+            return el ? el.textContent.trim() : `SKU${index + 1}`;
+        }
+
+        function createCopyButton(label, items) {
+            const btn = document.createElement('button');
+            btn.className = 'copyButton';
+            btn.innerText = `${label}をコピー（${items.length}件）`;
+            btn.title = '左クリック: 選択コピー / 右クリック: 全コピー';
+
+            btn.addEventListener('click', () => {
+                showCheckboxList(items, selected => {
+                    GM_setClipboard(selected.join('\n'));
+                    btn.innerText = `${label}をコピー（${selected.length}件）✔`;
+                    setTimeout(() => { btn.innerText = `${label}をコピー（${items.length}件）`; }, 1500);
+                });
+            });
+
+            btn.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                GM_setClipboard(items.join('\n'));
+                btn.innerText = `${label}をコピー（${items.length}件）✔`;
+                setTimeout(() => { btn.innerText = `${label}をコピー（${items.length}件）`; }, 1500);
+            });
+
+            return btn;
+        }
+
+        function createMasterCopyButton(allItems) {
+            const label = '一括コピー';
+            const btn = document.createElement('button');
+            btn.className = 'copyButton masterCopyButton';
+            btn.innerText = `${label}（${allItems.length}件）`;
+            btn.title = '左クリック: 選択して一括コピー / 右クリック: 全件一括コピー';
+
+            btn.addEventListener('click', () => {
+                showCheckboxList(allItems, selected => {
+                    GM_setClipboard(selected.join('\n'));
+                    btn.innerText = `${label}（${selected.length}件）✔`;
+                    setTimeout(() => { btn.innerText = `${label}（${allItems.length}件）`; }, 1500);
+                });
+            });
+
+            btn.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                GM_setClipboard(allItems.join('\n'));
+                btn.innerText = `${label}（${allItems.length}件）✔`;
+                setTimeout(() => { btn.innerText = `${label}（${allItems.length}件）`; }, 1500);
+            });
+
+            return btn;
+        }
+
+        function showCheckboxList(items, callback) {
+            document.querySelector('.checkboxList')?.remove();
 
             const listContainer = document.createElement('div');
             listContainer.className = 'checkboxList';
-            listContainer.style.width = `${listWidth}px`;
 
-            columnTexts.forEach((text, index) => {
+            const checkboxes = items.map((text, index) => {
                 const label = document.createElement('label');
-
-                const number = document.createTextNode(`${index + 1}. `);
-
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.checked = true;
                 checkbox.value = text;
-
-                label.appendChild(number);
-                label.appendChild(checkbox);
-                label.appendChild(document.createTextNode(text));
+                label.append(`${index + 1}. `, checkbox, text);
                 listContainer.appendChild(label);
+                return checkbox;
             });
 
-            const selectButton = document.createElement('button');
-            selectButton.className = 'selectButton';
-            selectButton.innerText = '全解除';
+            let allSelected = true;
 
-            selectButton.addEventListener('click', () => {
-                const checkboxes = listContainer.querySelectorAll('input[type="checkbox"]');
-                const allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
-
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = !allChecked;
-                });
-
-                selectButton.innerText = allChecked ? '全選択' : '全解除';
-            });
-
-            listContainer.addEventListener('change', () => {
-                const checkboxes = listContainer.querySelectorAll('input[type="checkbox"]');
-                const allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
-                selectButton.innerText = allChecked ? '全解除' : '全選択';
-            });
-
-            const concatButton = document.createElement('button');
-            concatButton.className = "concatButton";
-            concatButton.innerText = '連結';
-
-            isConcatMode = false;
-            concatButton.classList.remove('active');
-
-            concatButton.addEventListener('click', () => {
-                toggleConcatMode(concatButton);
-            });
+            const toggleButton = document.createElement('button');
+            toggleButton.className = 'selectToggleButton';
+            toggleButton.innerText = '全解除';
+            toggleButton.onclick = () => {
+                allSelected = !allSelected;
+                checkboxes.forEach(cb => cb.checked = allSelected);
+                toggleButton.innerText = allSelected ? '全解除' : '全選択';
+            };
 
             const okButton = document.createElement('button');
+            okButton.className = 'okButton';
             okButton.innerText = 'OK';
+            okButton.onclick = () => {
+                const selected = checkboxes.filter(cb => cb.checked).map(cb => cb.value);
+                listContainer.remove();
+                callback(selected);
+            };
 
-            okButton.addEventListener('click', () => {
-                const selectedItems = Array.from(listContainer.querySelectorAll('input:checked')).map(checkbox => checkbox.value);
-                cancelCheckboxList();
-                callback(selectedItems);
+            const closeButton = document.createElement('button');
+            closeButton.className = 'closeButton';
+            closeButton.innerText = '✕';
+            closeButton.onclick = () => listContainer.remove();
+
+            const btnWrapper = document.createElement('div');
+            btnWrapper.className = 'button-container';
+            btnWrapper.append(toggleButton, okButton, closeButton);
+
+            listContainer.appendChild(btnWrapper);
+            document.body.appendChild(listContainer);
+        }
+
+        function createReopenHandle() {
+            document.querySelector('.reopenHandle')?.remove();
+            const handle = document.createElement('div');
+            handle.className = 'reopenHandle';
+            handle.textContent = '表示';
+            handle.addEventListener('click', () => {
+                localStorage.setItem('cc_hidden', '0');
+                handle.remove();
+                buildWhenReady(true);
             });
+            document.body.appendChild(handle);
+        }
 
-            const cancelButton = document.createElement('button');
-            cancelButton.className = 'cancelButton';
-            cancelButton.innerText = '✕';
-            document.body.appendChild(cancelButton);
+        function buildContainer(flash = false) {
+            document.querySelector('.copyButtonsContainer')?.remove();
+            document.querySelector('.checkboxList')?.remove();
+            document.querySelector('.reopenHandle')?.remove();
 
-            let tooltipTimeout;
-            let tooltip;
-
-            cancelButton.addEventListener('dblclick', () => {
-                clearTimeout(tooltipTimeout);
-                cancelCheckboxList();
-            });
-
-            cancelButton.addEventListener('click', () => {
-                clearTimeout(tooltipTimeout);
-                tooltipTimeout = setTimeout(showTooltip, 300);
-            });
-
-            function showTooltip() {
-                if (tooltip) {
-                    tooltip.remove();
-                }
-
-                tooltip = document.createElement('div');
-                tooltip.className = 'tooltip';
-                tooltip.innerText = 'ダブルクリックかEscで閉じる';
-
-                tooltip.style.position = 'absolute';
-                tooltip.style.backgroundColor = '#333';
-                tooltip.style.color = '#fff';
-                tooltip.style.padding = '5px 10px';
-                tooltip.style.borderRadius = '4px';
-                tooltip.style.fontSize = '12px';
-                tooltip.style.zIndex = '10001';
-                tooltip.style.fontFamily = 'Arial, sans-serif';
-
-                const buttonRect = cancelButton.getBoundingClientRect();
-                const tooltipWidth = 120;
-
-                let tooltipLeft = buttonRect.right + window.scrollX + 5;
-                if (tooltipLeft + tooltipWidth > window.innerWidth) {
-                    tooltipLeft = buttonRect.left + window.scrollX - tooltipWidth - 5;
-                }
-                tooltip.style.top = `${buttonRect.bottom + window.scrollY + 5}px`;
-                tooltip.style.left = `${tooltipLeft}px`;
-
-                document.body.appendChild(tooltip);
-
+            const container = document.createElement('div');
+            container.className = 'copyButtonsContainer';
+            if (localStorage.getItem('cc_pinned') === '1') container.classList.add('pinned', 'visible');
+            if (flash) {
+                container.classList.add('visible');
                 setTimeout(() => {
-                    if (tooltip) tooltip.remove();
+                    if (!container.classList.contains('pinned')) container.classList.remove('visible');
                 }, 2000);
             }
 
-            const leftContainer = document.createElement('div');
-            leftContainer.style.flex = '1';
-            leftContainer.appendChild(selectButton);
+            const tools = document.createElement('div');
+            tools.className = 'row';
 
-            const rightContainer = document.createElement('div');
-            rightContainer.style.display = 'flex';
-            rightContainer.style.gap = '3px';
-            rightContainer.appendChild(concatButton);
-            rightContainer.appendChild(okButton);
-            rightContainer.appendChild(cancelButton);
+            const pinBtn = document.createElement('button');
+            pinBtn.className = 'pinToggle';
+            pinBtn.title = 'ピン留めで常時表示';
+            syncPinLabel();
+            pinBtn.addEventListener('click', togglePinned);
 
-            const actionButtonsContainer = document.createElement('div');
-            actionButtonsContainer.style.display = 'flex';
-            actionButtonsContainer.style.justifyContent = 'space-between';
-            actionButtonsContainer.style.position = 'sticky';
-            actionButtonsContainer.style.bottom = '-30px';
-            actionButtonsContainer.style.borderTop = '1px solid #ccc';
-            actionButtonsContainer.style.paddingBottom = '20px';
-            actionButtonsContainer.style.backgroundColor = '#ffffff';
-
-            actionButtonsContainer.appendChild(leftContainer);
-            actionButtonsContainer.appendChild(rightContainer);
-
-            listContainer.appendChild(actionButtonsContainer);
-
-            document.body.appendChild(listContainer);
-
-            function handleEscKey(event) {
-                if (event.key === 'Escape') {
-                    cancelCheckboxList();
-                }
-            }
-            document.addEventListener('keydown', handleEscKey);
-
-            function cancelCheckboxList() {
-                document.body.removeChild(listContainer);
-                document.removeEventListener('keydown', handleEscKey);
-            }
-        }
-
-        function getUniqueItemCount(copyColumn) {
-            const columnTexts = new Set();
-            document.querySelectorAll(`.next-table .next-table-body .next-table-cell[data-next-table-col="${copyColumn}"]`).forEach(cell => {
-                const text = cell.innerText.trim();
-                if (text) {
-                    columnTexts.add(text);
-                }
-            });
-            return columnTexts.size;
-        }
-
-        function addButtons() {
-            const headers = document.querySelectorAll('.next-table .next-table-header-inner th .next-table-cell-wrapper');
-            let priceColumnIndex = -1;
-            headers.forEach((header, index) => {
-                const headerText = header.innerText.trim();
-                if (headerText.includes('价格')) {
-                    priceColumnIndex = index;
-                }
+            const hideBtn = document.createElement('button');
+            hideBtn.className = 'hideToggle';
+            hideBtn.textContent = '非表示';
+            hideBtn.addEventListener('click', () => {
+                localStorage.setItem('cc_hidden', '1');
+                cleanupProximity?.(); cleanupProximity = null;
+                container.remove();
+                document.querySelector('.checkboxList')?.remove();
+                createReopenHandle();
             });
 
-            let topPosition = 35;
-            headers.forEach((header, index) => {
-                const headerText = header.innerText.trim();
-                if (index >= priceColumnIndex) {
-                    return;
-                }
+            tools.append(pinBtn, hideBtn);
+            container.appendChild(tools);
 
-                const button = document.createElement('button');
-                button.className = 'copyButton';
-                button.style.top = `${topPosition}px`;
-                button.innerText = `${headerText}をコピー（0件）`;
-                document.body.appendChild(button);
+            const allValuesSet = new Set();
 
-                function updateButtonCount() {
-                    const itemCount = getUniqueItemCount(index);
-                    button.innerText = `${headerText}をコピー（${itemCount}件）`;
-                }
-
-                button.addEventListener('click', () => {
-                    const columnTexts = new Set();
-                    document.querySelectorAll(`.next-table .next-table-body .next-table-cell[data-next-table-col="${index}"]`).forEach(cell => {
-                        const text = cell.innerText.trim();
-                        if (text) {
-                            columnTexts.add(text);
-                        }
-                    });
-
-                    showCheckboxList(Array.from(columnTexts), selectedItems => {
-                        const separator = isConcatMode ? '、' : '\n';
-                        const textToCopy = selectedItems.join(separator);
-                        GM_setClipboard(textToCopy);
-                        button.innerText = `${selectedItems.length}件コピーしました`;
-
-                        setTimeout(updateButtonCount, 2000);
-                    });
-
-                    setTimeout(updateButtonCount, 2000);
+            if (SELECTOR?.name === 'selector-table-adv') {
+                const ths = Array.from(document.querySelectorAll(SELECTOR.skuSection))
+                .filter(isSkuHeaderCell);
+                ths.forEach((th, idx) => {
+                    const label = getFeatureTitle(th, idx);
+                    const values = collectTitlesFromFeatureItem(th);
+                    values.forEach(v => allValuesSet.add(v));
+                    if (values.length > 0) container.appendChild(createCopyButton(label, values));
                 });
-
-                const observer = new MutationObserver(updateButtonCount);
-                observer.observe(document.querySelector('.next-table .next-table-body'), { childList: true, subtree: true });
-
-                updateButtonCount();
-                topPosition += 50;
-            });
-        }
-
-        addButtons();
-
-        function initSecondScript() {
-            let skuButton, propButton, bulkButton;
-
-            GM_addStyle(`
-            .bulkCopyButton {
-                position: fixed;
-                right: 10px;
-                z-index: 1000;
-                background-color: #28a745;
-                color: white;
-                border: none;
-                padding: 10px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-family: Arial, sans-serif;
-                margin-bottom: 5px;
-            }
-        `);
-
-            function createButton(id, className, display = 'none') {
-                const button = document.createElement("button");
-                button.id = id;
-                button.className = className;
-                button.style.display = display;
-                document.body.appendChild(button);
-                return button;
-            }
-
-            function toggleConcatMode(button) {
-                isConcatMode = !isConcatMode;
-                button.classList.toggle('active', isConcatMode);
-            }
-
-            function showCheckboxList(columnTexts, callback) {
-                let existingList = document.querySelector('.checkboxList');
-                if (existingList) {
-                    document.body.removeChild(existingList);
-                }
-
-                const longestTextLength = Math.max(...columnTexts.map(text => text.length));
-                const listWidth = Math.max(200, Math.min(600, longestTextLength * 21));
-
-                const listContainer = document.createElement('div');
-                listContainer.className = 'checkboxList';
-                listContainer.style.width = `${listWidth}px`;
-
-                columnTexts.forEach((text, index) => {
-                    const label = document.createElement('label');
-
-                    const number = document.createTextNode(`${index + 1}. `);
-
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.checked = true;
-                    checkbox.value = text;
-
-                    label.appendChild(number);
-                    label.appendChild(checkbox);
-                    label.appendChild(document.createTextNode(text));
-                    listContainer.appendChild(label);
-                });
-
-                const selectButton = document.createElement('button');
-                selectButton.className = 'selectButton';
-                selectButton.innerText = '全解除';
-
-                selectButton.addEventListener('click', () => {
-                    const checkboxes = listContainer.querySelectorAll('input[type="checkbox"]');
-                    const allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
-
-                    checkboxes.forEach(checkbox => {
-                        checkbox.checked = !allChecked;
-                    });
-
-                    selectButton.innerText = allChecked ? '全選択' : '全解除';
-                });
-
-                listContainer.addEventListener('change', () => {
-                    const checkboxes = listContainer.querySelectorAll('input[type="checkbox"]');
-                    const allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
-                    selectButton.innerText = allChecked ? '全解除' : '全選択';
-                });
-
-                const concatButton = document.createElement('button');
-                concatButton.className = "concatButton";
-                concatButton.innerText = '連結';
-
-                isConcatMode = false;
-                concatButton.classList.remove('active');
-
-                concatButton.addEventListener('click', () => {
-                    toggleConcatMode(concatButton);
-                });
-
-                const okButton = document.createElement('button');
-                okButton.innerText = 'OK';
-
-                okButton.addEventListener('click', () => {
-                    const selectedItems = Array.from(listContainer.querySelectorAll('input:checked')).map(checkbox => checkbox.value);
-                    cancelCheckboxList();
-                    callback(selectedItems);
-                });
-
-                const cancelButton = document.createElement('button');
-                cancelButton.className = 'cancelButton';
-                cancelButton.innerText = '✕';
-                document.body.appendChild(cancelButton);
-
-                let tooltipTimeout;
-                let tooltip;
-
-                cancelButton.addEventListener('dblclick', () => {
-                    clearTimeout(tooltipTimeout);
-                    cancelCheckboxList();
-                });
-
-                cancelButton.addEventListener('click', () => {
-                    clearTimeout(tooltipTimeout);
-                    tooltipTimeout = setTimeout(showTooltip, 300);
-                });
-
-                function showTooltip() {
-                    if (tooltip) {
-                        tooltip.remove();
-                    }
-
-                    tooltip = document.createElement('div');
-                    tooltip.className = 'tooltip';
-                    tooltip.innerText = 'ダブルクリックかEscで閉じる';
-
-                    tooltip.style.position = 'absolute';
-                    tooltip.style.backgroundColor = '#333';
-                    tooltip.style.color = '#fff';
-                    tooltip.style.padding = '5px 10px';
-                    tooltip.style.borderRadius = '4px';
-                    tooltip.style.fontSize = '12px';
-                    tooltip.style.zIndex = '10001';
-                    tooltip.style.fontFamily = 'Arial, sans-serif';
-
-                    const buttonRect = cancelButton.getBoundingClientRect();
-                    const tooltipWidth = 120;
-
-                    let tooltipLeft = buttonRect.right + window.scrollX + 5;
-                    if (tooltipLeft + tooltipWidth > window.innerWidth) {
-                        tooltipLeft = buttonRect.left + window.scrollX - tooltipWidth - 5;
-                    }
-                    tooltip.style.top = `${buttonRect.bottom + window.scrollY + 5}px`;
-                    tooltip.style.left = `${tooltipLeft}px`;
-
-                    document.body.appendChild(tooltip);
-
-                    setTimeout(() => {
-                        if (tooltip) tooltip.remove();
-                    }, 2000);
-                }
-
-                const leftContainer = document.createElement('div');
-                leftContainer.style.flex = '1';
-                leftContainer.appendChild(selectButton);
-
-                const rightContainer = document.createElement('div');
-                rightContainer.style.display = 'flex';
-                rightContainer.style.gap = '3px';
-                rightContainer.appendChild(concatButton);
-                rightContainer.appendChild(okButton);
-                rightContainer.appendChild(cancelButton);
-
-                const actionButtonsContainer = document.createElement('div');
-                actionButtonsContainer.style.display = 'flex';
-                actionButtonsContainer.style.justifyContent = 'space-between';
-                actionButtonsContainer.style.position = 'sticky';
-                actionButtonsContainer.style.bottom = '-30px';
-                actionButtonsContainer.style.borderTop = '1px solid #ccc';
-                actionButtonsContainer.style.paddingBottom = '20px';
-                actionButtonsContainer.style.backgroundColor = '#ffffff';
-
-                actionButtonsContainer.appendChild(leftContainer);
-                actionButtonsContainer.appendChild(rightContainer);
-
-                listContainer.appendChild(actionButtonsContainer);
-
-                document.body.appendChild(listContainer);
-
-                function handleEscKey(event) {
-                    if (event.key === 'Escape') {
-                        cancelCheckboxList();
-                    }
-                }
-                document.addEventListener('keydown', handleEscKey);
-
-                function cancelCheckboxList() {
-                    document.body.removeChild(listContainer);
-                    document.removeEventListener('keydown', handleEscKey);
-                }
-            }
-
-            function initButtons() {
-                let topPosition = 35;
-
-                skuButton = createButton("skuCopyButton", "copyButton");
-                propButton = createButton("propCopyButton", "copyButton");
-
-                if (skuButton) {
-                    skuButton.style.top = `${topPosition}px`;
-                    topPosition += 50;
-                }
-
-                if (propButton) {
-                    propButton.style.top = `${topPosition}px`;
-                    topPosition += 50;
-                }
-
-                bulkButton = createButton("bulkCopyButton", "bulkCopyButton", "block");
-                bulkButton.style.top = `${topPosition}px`;
-                topPosition += 50;
-
-                function updateButtonText() {
-                    let propNames = document.querySelectorAll(".sku-prop-module-name");
-                    if (propNames.length === 0) {
-                        propNames = document.querySelectorAll(".sku-selector-name");
-                    }
-                    const propTexts = Array.from(propNames).map(el => el.textContent.trim());
-
-                    let skuItems = document.querySelectorAll(".sku-item-name");
-                    if (skuItems.length === 0) {
-                        skuItems = document.querySelectorAll(".sku-item-name-text");
-                    }
-                    let propItems = document.querySelectorAll(".prop-name");
-                    if (propItems.length === 0) {
-                        propItems = document.querySelectorAll(".prop-item-text");
-                    }
-
-                    let topPosition = 35;
-
-                    if (propTexts.length >= 2) {
-                        const uniquePropItems = Array.from(new Set(Array.from(propItems).map(item => item.textContent.trim()).filter(text => text)));
-                        const uniqueSkuItems = Array.from(new Set(Array.from(skuItems).map(item => item.textContent.trim()).filter(text => text)));
-
-                        skuButton.innerText = `${propTexts[0]}をコピー（${uniquePropItems.length}件）`;
-                        propButton.innerText = `${propTexts[1]}をコピー（${uniqueSkuItems.length}件）`;
-                        skuButton.style.top = `${topPosition}px`;
-                        skuButton.style.display = "block";
-                        topPosition += 50;
-                        propButton.style.top = `${topPosition}px`;
-                        propButton.style.display = "block";
-                        topPosition += 50;
-                    } else {
-                        skuButton.style.display = "none";
-                        propButton.style.display = "none";
-                    }
-
-                    const totalUniqueItems = new Set([...propItems, ...skuItems].map(item => item.textContent.trim()).filter(text => text)).size;
-                    bulkButton.innerText = `一括コピー（${totalUniqueItems}件）`;
-                    bulkButton.style.top = `${topPosition}px`;
-                }
-
-                function copyItems(items, button) {
-                    const uniqueItems = Array.from(new Set(Array.from(items).map(item => item.textContent.trim()).filter(text => text)));
-                    if (uniqueItems.length > 0) {
-                        showCheckboxList(uniqueItems, selectedItems => {
-                            const separator = isConcatMode ? '、' : '\n';
-                            const textToCopy = selectedItems.join(separator);
-                            GM_setClipboard(textToCopy);
-                            button.innerText = `${selectedItems.length}件コピーしました`;
-
-                            setTimeout(updateButtonText, 2000);
-                        });
-                    }
-                }
-
-                skuButton.addEventListener("click", () => {
-                    copyItems(document.querySelectorAll(".prop-name, .prop-item-text"), skuButton);
-                });
-
-                propButton.addEventListener("click", () => {
-                    copyItems(document.querySelectorAll(".sku-item-name, .sku-item-name-text"), propButton);
-                });
-
-                bulkButton.addEventListener("click", () => {
-                    const skuItems = document.querySelectorAll(".sku-item-name, .sku-item-name-text");
-                    const propItems = document.querySelectorAll(".prop-name, .prop-item-text");
-
-                    const uniqueSkuItems = Array.from(new Set(Array.from(skuItems).map(item => item.textContent.trim()).filter(text => text)));
-                    const uniquePropItems = Array.from(new Set(Array.from(propItems).map(item => item.textContent.trim()).filter(text => text)));
-
-                    showCheckboxList([...uniquePropItems, ...uniqueSkuItems], selectedItems => {
-                        const separator = isConcatMode ? '、' : '\n';
-                        const textToCopy = selectedItems.join(separator);
-                        GM_setClipboard(textToCopy);
-                        bulkButton.innerText = `${selectedItems.length}件コピーしました`;
-
-                        setTimeout(updateButtonText, 2000);
-                    });
-                });
-
-                const debouncedUpdateButtonText = debounce(updateButtonText, 500);
-                const observer = new MutationObserver(debouncedUpdateButtonText);
-                observer.observe(document.body, { childList: true, subtree: true });
-
-                updateButtonText();
-            }
-
-            function debounce(func, wait) {
-                let timeout;
-                return function(...args) {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(() => func.apply(this, args), wait);
-                };
-            }
-
-            initButtons();
-        }
-
-        window.addEventListener('load', () => {
-            const specElement = Array.from(document.querySelectorAll('.next-table .next-table-header-inner th .next-table-cell-wrapper')).find(el => el.textContent.includes('(元)'));
-            if (specElement) {
-                addButtons();
             } else {
-                initSecondScript();
+                const featureItems = document.querySelectorAll(SELECTOR.skuSection);
+                featureItems.forEach((item, index) => {
+                    const label = getFeatureTitle(item, index);
+                    const values = collectTitlesFromFeatureItem(item);
+                    values.forEach(v => allValuesSet.add(v));
+                    if (values.length > 0) container.appendChild(createCopyButton(label, values));
+                });
             }
-        });
 
-        const style = `
-#weight-display {
-    position: fixed;
-    bottom: 160px;
-    right: 20px;
-    background-color: rgba(255, 255, 255, 0.9);
-    border: 1px solid #ddd;
-    padding: 10px;
-    font-size: 14px;
-    font-family: Arial, sans-serif;
-    z-index: 1998;
-    text-align: center;
-    white-space: pre-line;
-}
-#help-button {
-    position: fixed;
-    bottom: 205px;
-    right: 21px;
-    font-size: 12px;
-    font-family: Arial, sans-serif;
-    cursor: pointer;
-    z-index: 1999;
-    text-decoration: none;
-}
-#help-button:hover {
-    color: #0056b3;
-}
-`;
+            const allValues = Array.from(allValuesSet);
+            if (allValues.length > 0) container.appendChild(createMasterCopyButton(allValues));
 
-        const styleSheet = document.createElement('style');
-        styleSheet.type = 'text/css';
-        styleSheet.innerText = style;
-        document.head.appendChild(styleSheet);
+            document.body.appendChild(container);
+            cleanupProximity = setupProximityReveal(container);
 
-        function findWeightColumnIndex() {
-            const headerCells = document.querySelectorAll('.od-pc-offer-table thead tr th');
-            for (let i = 0; i < headerCells.length; i++) {
-                if (headerCells[i].textContent.trim() === '重量(g)') {
-                    return i;
-                }
+            function togglePinned() {
+                const isPinned = container.classList.toggle('pinned');
+                if (isPinned) container.classList.add('visible');
+                localStorage.setItem('cc_pinned', isPinned ? '1' : '0');
+                syncPinLabel();
             }
-            return -1;
+            function syncPinLabel() {
+                const pinned = localStorage.getItem('cc_pinned') === '1';
+                pinBtn.textContent = pinned ? '📍' : '📌';
+            }
         }
 
-        function fetchAllWeightInfo(columnIndex) {
-            if (columnIndex === -1) return [];
-            const weightCells = document.querySelectorAll(`.od-pc-offer-table tbody tr td:nth-child(${columnIndex + 1})`);
-            const weights = Array.from(weightCells).map(cell => {
-                const weight = cell.getAttribute('title') || cell.textContent.trim();
-                return parseFloat(weight);
-            }).filter(value => !isNaN(value));
-            return weights;
-        }
+        function setupProximityReveal(container) {
+            const NEAR_X = 160, NEAR_Y = 220, HIDE_DELAY = 0;
 
-        function calculateMinMax(weights) {
-            if (weights.length === 0) return null;
-            const min = Math.min(...weights);
-            const max = Math.max(...weights);
-            return { min, max };
-        }
+            let rafId = 0;
+            let lastMove = { x: 0, y: 0 };
+            let hideTimer = 0;
 
-        const displayDiv = document.createElement('div');
-        displayDiv.id = 'weight-display';
-        displayDiv.textContent = '重量情報を取得中...';
+            const isPinned = () => container.classList.contains('pinned');
 
-        const helpButton = document.createElement('div');
-        helpButton.id = 'help-button';
-        helpButton.textContent = '？';
-        helpButton.title = '※この情報はページ下部から取得しています\n　別の場所にある場合は取得できません';
+            function onMouseMove(e) {
+                lastMove = { x: e.clientX, y: e.clientY };
+                if (!rafId) rafId = requestAnimationFrame(tick);
+            }
+            function onScroll() {
+                if (isPinned()) return;
+                if (!container.matches(':hover,:focus-within')) container.classList.remove('visible');
+            }
+            function tick() {
+                rafId = 0;
+                if (isPinned()) return;
+                const nearRight = (window.innerWidth - lastMove.x) <= NEAR_X;
+                const nearTop = lastMove.y <= NEAR_Y;
+                const show = nearRight && nearTop;
 
-        document.body.appendChild(helpButton);
-        document.body.appendChild(displayDiv);
-
-        function updateWeightDisplay() {
-            const columnIndex = findWeightColumnIndex();
-            if (columnIndex !== -1) {
-                const weights = fetchAllWeightInfo(columnIndex);
-                const range = calculateMinMax(weights);
-                if (range) {
-                    if (range.min === range.max) {
-                        displayDiv.textContent = `重量(g)\n${range.min}`;
-                    } else {
-                        displayDiv.textContent = `重量(g)\n${range.min} ～ ${range.max}`;
-                    }
+                if (show || container.matches(':hover,:focus-within')) {
+                    container.classList.add('visible');
+                    clearTimeout(hideTimer);
                 } else {
-                    displayDiv.textContent = '重量不明';
+                    clearTimeout(hideTimer);
+                    hideTimer = setTimeout(() => container.classList.remove('visible'), HIDE_DELAY);
                 }
-            } else {
-                displayDiv.textContent = '重量不明';
             }
+
+            window.addEventListener('mousemove', onMouseMove, { passive: true });
+            window.addEventListener('scroll', onScroll, { passive: true });
+
+            return () => {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('scroll', onScroll);
+                clearTimeout(hideTimer);
+                if (rafId) cancelAnimationFrame(rafId);
+            };
         }
 
-        function waitForTableAndUpdate() {
-            const maxTries = 20;
+        function buildWhenReady(flash = false) {
             let tries = 0;
-
-            const intervalId = setInterval(() => {
-                const tableExists = document.querySelector('.od-pc-offer-table thead tr th');
-                if (tableExists) {
-                    clearInterval(intervalId);
-                    updateWeightDisplay();
-                } else {
-                    tries++;
-                    if (tries >= maxTries) {
-                        clearInterval(intervalId);
-                        displayDiv.textContent = '重量不明';
-                    }
+            (function loop() {
+                if (!SELECTOR) {
+                    for (const v of SELECTOR_VARIANTS) { if (v.detect()) { SELECTOR = v; break; } }
                 }
-            }, 500);
+                const ready = SELECTOR && document.querySelectorAll(SELECTOR.skuSection).length > 0;
+                if (ready) {
+                    if (localStorage.getItem('cc_hidden') === '1') {
+                        createReopenHandle();
+                    } else {
+                        buildContainer(flash);
+                    }
+                } else if (tries++ < 50) {
+                    setTimeout(loop, 200);
+                } else {
+                    console.warn('[SKU Copy] build timeout, fallback UI');
+                    SELECTOR = SELECTOR || SELECTOR_VARIANTS[0];
+                    buildContainer(flash);
+                }
+            })();
         }
 
-        waitForTableAndUpdate();
+        function waitForDom() {
+            for (const variant of SELECTOR_VARIANTS) {
+                if (variant.detect()) { SELECTOR = variant; break; }
+            }
+            const ok = SELECTOR && document.querySelectorAll(SELECTOR.skuSection).length > 0;
+            if (ok) {
+                if (localStorage.getItem('cc_hidden') === '1') {
+                    createReopenHandle();
+                } else {
+                    buildContainer();
+                }
+            } else {
+                setTimeout(waitForDom, 500);
+            }
+        }
+
+        if (localStorage.getItem('cc_hidden') === '1') {
+            createReopenHandle();
+            waitForDom();
+        } else {
+            waitForDom();
+        }
+
     }
 
     function enhanceAxisCodeManager(){
@@ -6368,10 +6086,16 @@ transition: all 0.3s ease-in-out;
         document.addEventListener('click', handleClickOutside);
     }
 
-    function removeUnwantedImgs(){
+    function removeUnwantedImgs() {
+        'use strict';
 
         let isScriptActive = false;
         let isHighlightActive = true;
+
+        const LS_KEYS = {
+            PINNED: 'rui_pinned',
+            HIDDEN: 'rui_hidden',
+        };
 
         const selectorsToRemove = [
             '.sdmap-dynamic-offer-list',
@@ -6392,7 +6116,103 @@ transition: all 0.3s ease-in-out;
             'div[style*="width: 164px;"][style*="height: 108px;"][style*="position: absolute;"][style*="top: 22px;"][style*="right: -82px;"][style*="z-index: 1;"]',
             'div[style*="height: 82px;"][style*="width: 162px;"]',
             'img[style*="height: 14px"][style*="margin: 0px"][style*="padding: 0px"]',
+
+            '#shopProductRecommend',
         ];
+
+        (function injectStylesOnce() {
+            if (document.getElementById('rui-style')) return;
+            const css = `
+        .rui-container {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: opacity .2s ease, transform .2s ease;
+            pointer-events: auto;
+        }
+        .rui-container.hidden { display: none; }
+
+        .rui-btn {
+            padding: 10px 12px;
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font:14px/1 Arial, sans-serif;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,.12);
+            opacity: .08;
+            transform: translateY(0);
+            transition: opacity .18s ease, filter .18s ease, box-shadow .18s ease, transform .18s ease;
+        }
+        .rui-btn:disabled { cursor: not-allowed; }
+        #toggleButton { background-color: #4CAF50; }
+        #highlightButton { background-color: #FF9800; }
+
+        .rui-container.near .rui-btn,
+        .rui-container.pinned .rui-btn,
+        .rui-btn:hover,
+        .rui-btn:focus {
+            opacity: 1;
+            filter: saturate(1.1);
+            box-shadow: 0 8px 18px rgba(0,0,0,.18);
+            transform: translateY(-1px);
+        }
+
+        .rui-icon {
+            width: 25px; height: 25px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: #333;
+            background: #fff;
+            border: 1px solid rgba(0,0,0,.08);
+            box-shadow: 0 2px 6px rgba(0,0,0,.08);
+            cursor: pointer;
+            opacity: .4;
+            transition: opacity .18s ease, transform .18s ease, box-shadow .18s ease;
+        }
+        .rui-icon:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 6px 12px rgba(0,0,0,.12); }
+        .rui-toolbar {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .rui-pin.active { color: #e91e63; border-color: rgba(233,30,99,.25); }
+        .rui-show-chip {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 10000;
+            background:#666666e6;
+            color: #fff;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font:12px/1 Arial, sans-serif;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,.2);
+            opacity: .6;
+            transition: opacity .2s ease, transform .2s ease;
+        }
+        .rui-show-chip:hover { opacity: 1; transform: translateY(-1px); }
+
+        .highlight-overlay {
+            position: absolute !important;
+            inset: 0;
+            background-color: rgba(255, 0, 0, 0.3);
+            pointer-events: none;
+        }
+        `;
+            const style = document.createElement('style');
+            style.id = 'rui-style';
+            style.textContent = css;
+            document.head.appendChild(style);
+        })();
 
         function removeElements() {
             if (!isScriptActive) return;
@@ -6401,23 +6221,20 @@ transition: all 0.3s ease-in-out;
             tables.forEach((table) => {
                 const productImages = table.querySelectorAll('.desc-img-loaded');
                 let shouldRemoveTable = false;
-
                 productImages.forEach((img) => {
                     const width = img.offsetWidth;
-                    if (width <= 301) {
-                        shouldRemoveTable = true;
-                    }
+                    if (width <= 301) shouldRemoveTable = true;
                 });
-
-                if (shouldRemoveTable) {
-                    table.remove();
-                }
+                if (shouldRemoveTable) table.remove();
             });
 
             selectorsToRemove.forEach(selector => {
                 const elements = document.querySelectorAll(selector);
                 elements.forEach((element) => {
-                    if (!element.closest('div.sku-item-wrapper') && !element.closest('div[style="width: 790px; position: relative;"]')) {
+                    if (
+                        !element.closest('div.sku-item-wrapper') &&
+                        !element.closest('div[style="width: 790px; position: relative;"]')
+                    ) {
                         element.remove();
                     }
                 });
@@ -6427,21 +6244,19 @@ transition: all 0.3s ease-in-out;
             descImages.forEach((img) => {
                 const width = img.offsetWidth;
                 const height = img.offsetHeight;
-                if (width <= 200 && height <= 200) {
-                    img.remove();
-                }
+                if (width <= 200 && height <= 200) img.remove();
             });
 
             const specialDivs = document.querySelectorAll('div[style*="background: url"][style*="width: 164px"][style*="height: 108px"]');
-            specialDivs.forEach((div) => {
-                div.remove();
-            });
+            specialDivs.forEach((div) => div.remove());
 
             const toggleButton = document.getElementById('toggleButton');
-            toggleButton.innerText = '削除済み';
-            toggleButton.style.backgroundColor = '#B0BEC5';
-            toggleButton.style.cursor = 'default';
-            toggleButton.disabled = true;
+            if (toggleButton) {
+                toggleButton.innerText = '削除済み';
+                toggleButton.style.backgroundColor = '#B0BEC5';
+                toggleButton.style.cursor = 'default';
+                toggleButton.disabled = true;
+            }
         }
 
         function highlightElements() {
@@ -6451,24 +6266,13 @@ transition: all 0.3s ease-in-out;
             tables.forEach((table) => {
                 const productImages = table.querySelectorAll('.desc-img-loaded');
                 let shouldHighlightTable = false;
-
                 productImages.forEach((img) => {
                     const width = img.offsetWidth;
-                    if (width <= 301) {
-                        shouldHighlightTable = true;
-                    }
+                    if (width <= 301) shouldHighlightTable = true;
                 });
-
                 if (shouldHighlightTable) {
                     table.style.position = 'relative';
                     const overlay = document.createElement('div');
-                    overlay.style.position = 'absolute';
-                    overlay.style.top = '0';
-                    overlay.style.left = '0';
-                    overlay.style.width = '100%';
-                    overlay.style.height = '100%';
-                    overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
-                    overlay.style.pointerEvents = 'none';
                     overlay.classList.add('highlight-overlay');
                     table.appendChild(overlay);
                 }
@@ -6478,15 +6282,8 @@ transition: all 0.3s ease-in-out;
                 const elements = document.querySelectorAll(selector);
                 elements.forEach((element) => {
                     if (!element.classList.contains('highlight-overlay')) {
-                        element.style.position = 'relative';
+                        element.style.position = element.style.position || 'relative';
                         const overlay = document.createElement('div');
-                        overlay.style.position = 'absolute';
-                        overlay.style.top = '0';
-                        overlay.style.left = '0';
-                        overlay.style.width = '100%';
-                        overlay.style.height = '100%';
-                        overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
-                        overlay.style.pointerEvents = 'none';
                         overlay.classList.add('highlight-overlay');
                         element.appendChild(overlay);
                     }
@@ -6496,16 +6293,10 @@ transition: all 0.3s ease-in-out;
             const imgElements = document.querySelectorAll('img[usemap]');
             imgElements.forEach((imgElement) => {
                 if (!imgElement.classList.contains('highlight-overlay')) {
-                    imgElement.style.position = 'relative';
+                    imgElement.style.position = imgElement.style.position || 'relative';
                     const overlay = document.createElement('div');
-                    overlay.style.position = 'absolute';
-                    overlay.style.top = '0';
-                    overlay.style.left = '0';
-                    overlay.style.width = '100%';
-                    overlay.style.height = '100%';
-                    overlay.style.backgroundColor = 'rgba(0, 0, 255, 0.3)';
-                    overlay.style.pointerEvents = 'none';
                     overlay.classList.add('highlight-overlay');
+                    overlay.style.backgroundColor = 'rgba(0, 0, 255, 0.3)';
                     imgElement.appendChild(overlay);
                 }
             });
@@ -6517,7 +6308,8 @@ transition: all 0.3s ease-in-out;
             const areas = document.querySelectorAll('area[href]');
             areas.forEach((area) => {
                 const coords = area.coords.split(',').map(Number);
-                const img = document.querySelector(`img[usemap="#${area.parentElement.name}"]`);
+                const mapName = area.parentElement && area.parentElement.name;
+                const img = mapName ? document.querySelector(`img[usemap="#${mapName}"]`) : null;
 
                 if (img && coords.length === 4) {
                     const overlay = document.createElement('div');
@@ -6529,353 +6321,571 @@ transition: all 0.3s ease-in-out;
                     overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
                     overlay.style.pointerEvents = 'none';
                     overlay.classList.add('highlight-overlay');
+                    img.parentElement.style.position = img.parentElement.style.position || 'relative';
                     img.parentElement.appendChild(overlay);
                 }
             });
         }
 
         function removeHighlight() {
-            const overlays = document.querySelectorAll('.highlight-overlay');
-            overlays.forEach(overlay => {
-                overlay.remove();
-            });
+            document.querySelectorAll('.highlight-overlay').forEach(el => el.remove());
         }
 
         function toggleScript() {
             isScriptActive = !isScriptActive;
-            const toggleButton = document.getElementById('toggleButton');
-
-            if (isScriptActive) {
-                removeElements();
-            }
+            if (isScriptActive) removeElements();
         }
 
         function toggleHighlight() {
             isHighlightActive = !isHighlightActive;
             const highlightButton = document.getElementById('highlightButton');
-
             if (isHighlightActive) {
-                highlightButton.innerText = 'ハイライト停止';
+                if (highlightButton) highlightButton.innerText = 'ハイライト停止';
                 highlightElements();
             } else {
-                highlightButton.innerText = 'ハイライト開始';
+                if (highlightButton) highlightButton.innerText = 'ハイライト開始';
                 removeHighlight();
             }
         }
 
-        function createToggleButton() {
-            const button = document.createElement('button');
-            button.id = 'toggleButton';
-            button.innerText = '画像を削除';
-            button.style.position = 'fixed';
-            button.style.bottom = '70px';
-            button.style.right = '20px';
-            button.style.zIndex = '1000';
-            button.style.padding = '10px 20px';
-            button.style.backgroundColor = '#4CAF50';
-            button.style.color = 'white';
-            button.style.border = 'none';
-            button.style.borderRadius = '5px';
-            button.style.cursor = 'not-allowed';
-            button.style.boxShadow = '0px 4px 6px rgba(0, 0, 0, 0.1)';
-            button.style.fontSize = '14px';
-            button.style.fontFamily = 'Arial, sans-serif';
-            button.disabled = true;
+        let ui = {
+            container: null,
+            toolbar: null,
+            toggleBtn: null,
+            highlightBtn: null,
+            pinBtn: null,
+            hideBtn: null,
+            showChip: null,
+        };
 
-            button.addEventListener('click', toggleScript);
+        function createUI() {
+            ui.container = document.createElement('div');
+            ui.container.className = 'rui-container';
+            document.body.appendChild(ui.container);
 
-            document.body.appendChild(button);
+            ui.toolbar = document.createElement('div');
+            ui.toolbar.className = 'rui-toolbar';
+            ui.container.appendChild(ui.toolbar);
+
+            ui.pinBtn = document.createElement('button');
+            ui.pinBtn.className = 'rui-icon rui-pin';
+            ui.pinBtn.title = 'ピン留め';
+            ui.pinBtn.setAttribute('aria-pressed', 'false');
+            ui.pinBtn.textContent = '📌';
+            ui.toolbar.appendChild(ui.pinBtn);
+
+            ui.hideBtn = document.createElement('button');
+            ui.hideBtn.className = 'rui-icon rui-hide';
+            ui.hideBtn.title = '隠す';
+            ui.hideBtn.textContent = '⤫';
+            ui.toolbar.appendChild(ui.hideBtn);
+
+            ui.toggleBtn = document.createElement('button');
+            ui.toggleBtn.id = 'toggleButton';
+            ui.toggleBtn.className = 'rui-btn';
+            ui.toggleBtn.textContent = '画像を削除';
+            ui.toggleBtn.disabled = true;
+            ui.container.appendChild(ui.toggleBtn);
+
+            ui.highlightBtn = document.createElement('button');
+            ui.highlightBtn.id = 'highlightButton';
+            ui.highlightBtn.className = 'rui-btn';
+            ui.highlightBtn.textContent = 'ハイライト停止';
+            ui.highlightBtn.disabled = true;
+            ui.container.appendChild(ui.highlightBtn);
+
+            ui.showChip = document.createElement('div');
+            ui.showChip.className = 'rui-show-chip';
+            ui.showChip.textContent = '表示';
+            ui.showChip.style.display = 'none';
+            document.body.appendChild(ui.showChip);
+
+            ui.toggleBtn.addEventListener('click', toggleScript);
+            ui.highlightBtn.addEventListener('click', toggleHighlight);
+            ui.pinBtn.addEventListener('click', onTogglePinned);
+            ui.hideBtn.addEventListener('click', onHideUI);
+            ui.showChip.addEventListener('click', onShowUI);
+
+            restorePinnedHiddenState();
+
+            initProximity();
         }
 
-        function createHighlightButton() {
-            const button = document.createElement('button');
-            button.id = 'highlightButton';
-            button.innerText = 'ハイライト停止';
-            button.style.position = 'fixed';
-            button.style.bottom = '20px';
-            button.style.right = '20px';
-            button.style.zIndex = '1000';
-            button.style.padding = '10px 20px';
-            button.style.backgroundColor = '#FF9800';
-            button.style.color = 'white';
-            button.style.border = 'none';
-            button.style.borderRadius = '5px';
-            button.style.cursor = 'not-allowed';
-            button.style.boxShadow = '0px 4px 6px rgba(0, 0, 0, 0.1)';
-            button.style.fontSize = '14px';
-            button.style.fontFamily = 'Arial, sans-serif';
-            button.disabled = true;
+        function isPinned() { return localStorage.getItem(LS_KEYS.PINNED) === '1'; }
+        function setPinned(v) { localStorage.setItem(LS_KEYS.PINNED, v ? '1' : '0'); }
+        function isHidden() { return localStorage.getItem(LS_KEYS.HIDDEN) === '1'; }
+        function setHidden(v) { localStorage.setItem(LS_KEYS.HIDDEN, v ? '1' : '0'); }
 
-            button.addEventListener('click', toggleHighlight);
-
-            document.body.appendChild(button);
+        function updatePinUI() {
+            const pinned = isPinned();
+            ui.pinBtn.textContent = pinned ? '📍' : '📌';
+            ui.pinBtn.title = pinned ? 'ピン解除' : 'ピン留め';
+            ui.pinBtn.setAttribute('aria-pressed', pinned ? 'true' : 'false');
+            ui.pinBtn.classList.toggle('active', pinned);
+            ui.container.classList.toggle('pinned', pinned);
         }
+
+        function restorePinnedHiddenState() {
+            updatePinUI();
+            if (isHidden()) {
+                ui.container.classList.add('hidden');
+                ui.showChip.style.display = 'block';
+            } else {
+                ui.container.classList.remove('hidden');
+                ui.showChip.style.display = 'none';
+            }
+        }
+
+        function onTogglePinned() {
+            const next = !isPinned();
+            setPinned(next);
+            restorePinnedHiddenState();
+        }
+
+        function onHideUI() {
+            setHidden(true);
+            restorePinnedHiddenState();
+        }
+
+        function onShowUI() {
+            setHidden(false);
+            restorePinnedHiddenState();
+            ui.container.classList.add('near');
+            setTimeout(() => ui.container.classList.remove('near'), 1200);
+        }
+
+        function initProximity() {
+            const THRESHOLD = 160;
+            let raf = null;
+
+            function measureNear(mouseX, mouseY) {
+                if (!ui.container || isHidden() || isPinned()) {
+                    if (ui.container && isPinned()) ui.container.classList.add('near');
+                    return;
+                }
+                const rect = ui.container.getBoundingClientRect();
+                const dx = (mouseX < rect.left) ? rect.left - mouseX : (mouseX > rect.right) ? mouseX - rect.right : 0;
+                const dy = (mouseY < rect.top) ? rect.top - mouseY : (mouseY > rect.bottom) ? mouseY - rect.bottom : 0;
+                const dist = Math.hypot(dx, dy);
+                if (dist <= THRESHOLD) ui.container.classList.add('near');
+                else ui.container.classList.remove('near');
+            }
+
+            function onMove(e) {
+                if (raf) cancelAnimationFrame(raf);
+                const x = e.clientX, y = e.clientY;
+                raf = requestAnimationFrame(() => measureNear(x, y));
+            }
+
+            window.addEventListener('mousemove', onMove, { passive: true });
+            ui.container.classList.toggle('near', isPinned());
+        }
+
+        function enableMainButtons() {
+            if (ui.toggleBtn) {
+                ui.toggleBtn.disabled = false;
+                ui.toggleBtn.style.cursor = 'pointer';
+            }
+            if (ui.highlightBtn) {
+                ui.highlightBtn.disabled = false;
+                ui.highlightBtn.style.cursor = 'pointer';
+            }
+        }
+
+        createUI();
 
         window.addEventListener('load', () => {
             highlightElements();
-            const toggleButton = document.getElementById('toggleButton');
-            const highlightButton = document.getElementById('highlightButton');
-
-            toggleButton.disabled = false;
-            toggleButton.style.cursor = 'pointer';
-
-            highlightButton.disabled = false;
-            highlightButton.style.cursor = 'pointer';
+            enableMainButtons();
         });
-
-        createToggleButton();
-        createHighlightButton();
     }
 
     function loadAllImages() {
         (function () {
+            'use strict';
+
+            function deepQueryAll(root, selector) {
+                const out = Array.from(root.querySelectorAll(selector));
+                for (const el of root.querySelectorAll('*')) {
+                    if (el.shadowRoot) out.push(...deepQueryAll(el.shadowRoot, selector));
+                }
+                return out;
+            }
+
+            function getRoots() {
+                const roots = [];
+                const classic = document.querySelector('.content-detail');
+                if (classic) roots.push(classic);
+
+                document.querySelectorAll('.html-description').forEach(h => {
+                    if (h.shadowRoot) roots.push(h.shadowRoot);
+                    else roots.push(h);
+                });
+
+                document.querySelectorAll('template[shadowrootmode="open"]').forEach(tpl => {
+                    if (tpl.content) roots.push(tpl.content);
+                });
+
+                if (!roots.length) roots.push(document);
+                return roots;
+            }
+
+            function pickFromSrcset(srcset) {
+                try {
+                    const items = srcset.split(',').map(s => s.trim()).map(s => {
+                        const [url, desc] = s.split(/\s+/);
+                        const score = desc?.endsWith('x') ? parseFloat(desc)
+                        : desc?.endsWith('w') ? parseFloat(desc)
+                        : 1;
+                        return { url, score: isNaN(score) ? 1 : score };
+                    }).sort((a,b)=>b.score-a.score);
+                    return items[0]?.url || '';
+                } catch { return ''; }
+            }
+
+            function resolveUrl(img) {
+                const dataAttrs = [
+                    'data-lazyload-src',
+                    'data-src',
+                    'data-origin',
+                    'data-lazysrc',
+                    'data-original',
+                ];
+                for (const a of dataAttrs) {
+                    const v = img.getAttribute(a);
+                    if (v) return { url: v, via: 'data' };
+                }
+                const srcset = img.getAttribute('srcset');
+                if (srcset) {
+                    const best = pickFromSrcset(srcset);
+                    if (best) return { url: best, via: 'srcset' };
+                }
+                if (img.currentSrc) return { url: img.currentSrc, via: 'currentSrc' };
+                if (img.src)       return { url: img.src, via: 'src' };
+                return { url: '', via: 'none' };
+            }
+
             function fixImage(img) {
-                const lazySrc =
-                      img.getAttribute('data-lazyload-src') ||
-                      img.getAttribute('data-src') ||
-                      img.getAttribute('data-origin') ||
-                      img.getAttribute('data-lazysrc') ||
-                      img.getAttribute('data-original') ||
-                      img.src;
+                img.loading = 'eager';
+                img.decoding = 'async';
+                try { img.fetchPriority = 'high'; } catch(_) {}
 
-                if (!lazySrc) return;
+                const { url: finalUrl, via } = resolveUrl(img);
+                if (!finalUrl) return;
 
-                img.src = lazySrc;
+                if (via === 'srcset') {
+                    img.setAttribute('src', finalUrl);
+                    if (img.hasAttribute('srcset')) img.removeAttribute('srcset');
+                    if (img.hasAttribute('sizes'))  img.removeAttribute('sizes');
+                } else {
+                    img.setAttribute('src', finalUrl);
+                    if (img.hasAttribute('srcset')) img.removeAttribute('srcset');
+                    if (img.hasAttribute('sizes'))  img.removeAttribute('sizes');
+                }
 
-                img.removeAttribute('data-lazyload-src');
-                img.removeAttribute('data-src');
-                img.removeAttribute('data-origin');
-                img.removeAttribute('data-lazysrc');
-                img.removeAttribute('data-original');
+                ['data-lazyload-src','data-src','data-origin','data-lazysrc','data-original']
+                    .forEach(a => img.removeAttribute(a));
 
                 img.style.setProperty('width', 'auto', 'important');
                 img.style.setProperty('height', 'auto', 'important');
                 img.style.setProperty('opacity', '1', 'important');
                 img.style.setProperty('visibility', 'visible', 'important');
 
-                const observer = new MutationObserver(() => {
-                    if (img.src !== lazySrc) {
-                        img.src = lazySrc;
+                const obs = new MutationObserver(muts => {
+                    for (const m of muts) {
+                        if (m.type === 'attributes') {
+                            if (m.attributeName === 'src' && img.getAttribute('src') !== finalUrl) {
+                                img.setAttribute('src', finalUrl);
+                            }
+                            if (m.attributeName === 'srcset' && img.hasAttribute('srcset')) {
+                                img.removeAttribute('srcset');
+                            }
+                        }
                     }
                 });
-                observer.observe(img, { attributes: true, attributeFilter: ['src'] });
-            }
-
-            function loadImages() {
-                document.querySelectorAll('.content-detail img, img.desc-img-no-load').forEach(fixImage);
-            }
-
-            function disableScrollHandlers() {
-                window.onscroll = null;
-                document.onscroll = null;
-                window.addEventListener(
-                    'scroll',
-                    function (e) {
-                        e.stopImmediatePropagation();
-                    },
-                    true
-                );
+                obs.observe(img, { attributes: true, attributeFilter: ['src','srcset'] });
             }
 
             function run() {
-                loadImages();
-                disableScrollHandlers();
+                const roots = getRoots();
+                const imgs = [];
+                for (const r of roots) imgs.push(...deepQueryAll(r, 'img'));
+                const uniq = Array.from(new Set(imgs));
+                uniq.forEach(fixImage);
             }
 
-            if (document.readyState === 'complete') {
-                run();
-            } else {
-                window.addEventListener('load', run);
-            }
+            if (document.readyState === 'complete') run();
+            else window.addEventListener('load', run, { once: true });
         })();
     }
 
-    function dlMergedImgs(){
+    function dlMergedImgs() {
+        'use strict';
 
-        GM_addStyle(`
-        #downloadMergedImageButton {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            padding: 10px 5px;
-            font-size: 14px;
-            font-family: Arial, sans-serif;
-            cursor: pointer;
-            z-index: 9999;
+        (function injectStylesOnce() {
+            if (document.getElementById('mgi-style')) return;
+            const css = `
+      .mgi-container{
+        position:fixed; left:20px; bottom:20px; z-index:10000;
+        display:flex; flex-direction:column; gap:10px; align-items:flex-start;
+        transition:opacity .18s ease, transform .18s ease; pointer-events:auto;
+      }
+      .mgi-container.hidden{ display:none; }
+      .mgi-toolbar{ display:flex; gap:8px; justify-content:flex-start; }
+
+      .mgi-icon{
+        width:25px;height:25px;border-radius:50%;
+        display:inline-flex;align-items:center;justify-content:center;
+        font-size:16px;color:#333;background:#fff;border:1px solid rgba(0,0,0,.08);
+        box-shadow:0 2px 6px rgba(0,0,0,.08); cursor:pointer; opacity:.4;
+        transition:opacity .18s ease, transform .18s ease, box-shadow .18s ease;
+      }
+      .mgi-icon:hover{ opacity:.9; transform:translateY(-1px); box-shadow:0 6px 12px rgba(0,0,0,.12); }
+      .mgi-pin.active{ color:#e91e63; border-color:rgba(233,30,99,.25); }
+
+      .mgi-btn{
+        display:inline-flex; align-items:center; justify-content:center;
+        width:auto; white-space:nowrap; align-self:flex-start;
+        padding:10px 12px; border:none; border-radius:10px;
+        color:#fff; font:14px/1 Arial, sans-serif; cursor:pointer;
+        box-shadow:0 4px 6px rgba(0,0,0,.12); background:#4CAF50;
+        opacity:.08; transform:translateY(0);
+        transition:opacity .18s ease, filter .18s ease, box-shadow .18s ease, transform .18s ease, background-color .18s ease;
+      }
+      .mgi-btn:hover, .mgi-btn:focus{ filter:saturate(1.05); transform:translateY(-1px); }
+      .mgi-container.near .mgi-btn, .mgi-container.pinned .mgi-btn{ opacity:1; }
+      .mgi-btn.processing{ background:#FFA500; cursor:not-allowed; }
+      .mgi-btn.complete{ background:#008CBA; }
+
+      .mgi-show-chip{
+        position:fixed; left:20px; bottom:20px; z-index:10000;
+        background:#666666e6;color:#fff;border-radius:999px;padding:8px 12px;
+        font:12px/1 Arial, sans-serif; cursor:pointer; box-shadow:0 4px 8px rgba(0,0,0,.2); opacity:.6;
+        transition:opacity .18s ease, transform .18s ease;
+      }
+      .mgi-show-chip:hover{ opacity:1; transform:translateY(-1px); }
+    `;
+            const style = document.createElement('style');
+            style.id = 'mgi-style';
+            style.textContent = css;
+            document.head.appendChild(style);
+        })();
+
+        const LS_KEYS = { PINNED: 'mgi_pinned', HIDDEN: 'mgi_hidden' };
+        const isPinned = () => localStorage.getItem(LS_KEYS.PINNED) === '1';
+        const setPinned = (v) => localStorage.setItem(LS_KEYS.PINNED, v ? '1' : '0');
+        const isHidden = () => localStorage.getItem(LS_KEYS.HIDDEN) === '1';
+        const setHidden = (v) => localStorage.setItem(LS_KEYS.HIDDEN, v ? '1' : '0');
+
+        const ui = {
+            container: document.createElement('div'),
+            toolbar: document.createElement('div'),
+            pinBtn: document.createElement('button'),
+            hideBtn: document.createElement('button'),
+            showChip: document.createElement('div'),
+            mergeBtn: document.createElement('button'),
+        };
+
+        ui.container.className = 'mgi-container';
+        ui.toolbar.className = 'mgi-toolbar';
+
+        ui.pinBtn.className = 'mgi-icon mgi-pin';
+        ui.pinBtn.title = 'ピン留め';
+        ui.pinBtn.setAttribute('aria-pressed', 'false');
+        ui.pinBtn.textContent = '📌';
+
+        ui.hideBtn.className = 'mgi-icon mgi-hide';
+        ui.hideBtn.title = '隠す';
+        ui.hideBtn.textContent = '⤫';
+
+        ui.mergeBtn.id = 'mgi-download-btn';
+        ui.mergeBtn.className = 'mgi-btn';
+        ui.mergeBtn.textContent = '結合画像 ⬇️';
+
+        ui.showChip.className = 'mgi-show-chip';
+        ui.showChip.textContent = '表示';
+        ui.showChip.style.display = 'none';
+
+        ui.toolbar.appendChild(ui.pinBtn);
+        ui.toolbar.appendChild(ui.hideBtn);
+        ui.container.appendChild(ui.toolbar);
+        ui.container.appendChild(ui.mergeBtn);
+        document.body.appendChild(ui.container);
+        document.body.appendChild(ui.showChip);
+
+        function updatePinUI() {
+            const pinned = isPinned();
+            ui.pinBtn.textContent = pinned ? '📍' : '📌';
+            ui.pinBtn.title = pinned ? 'ピン解除' : 'ピン留め';
+            ui.pinBtn.setAttribute('aria-pressed', pinned ? 'true' : 'false');
+            ui.pinBtn.classList.toggle('active', pinned);
+            ui.container.classList.toggle('pinned', pinned);
         }
-        #downloadMergedImageButton.processing {
-            background-color: #FFA500;
-            cursor: not-allowed;
+
+        function restorePinnedHiddenState() {
+            updatePinUI();
+            if (isHidden()) {
+                ui.container.classList.add('hidden');
+                ui.showChip.style.display = 'block';
+            } else {
+                ui.container.classList.remove('hidden');
+                ui.showChip.style.display = 'none';
+            }
         }
-        #downloadMergedImageButton.complete {
-            background-color: #008CBA;
+        function onTogglePinned(){ setPinned(!isPinned()); restorePinnedHiddenState(); }
+        function onHideUI(){ setHidden(true); restorePinnedHiddenState(); }
+        function onShowUI(){
+            setHidden(false); restorePinnedHiddenState();
+            ui.container.classList.add('near'); setTimeout(()=>ui.container.classList.remove('near'), 1200);
         }
-        #downloadMergedImageButton:hover:not(.processing) {
-            background-color: #45a049;
-        }
+        ui.pinBtn.addEventListener('click', onTogglePinned);
+        ui.hideBtn.addEventListener('click', onHideUI);
+        ui.showChip.addEventListener('click', onShowUI);
+        restorePinnedHiddenState();
 
-        .content-detail {
-            position: relative !important;
-        }
-        .content-detail img {
-            display: block !important;
-            margin: 0 auto !important;
-        }
-        .content-detail .overlay-line {
-            position: absolute !important;
-            left: 0 !important;
-            height: 2px !important;
-            background-color: transparent !important;
-            border-top: 2px dotted #FF6347 !important;
-            z-index: 8 !important;
-        }
-
-    `);
-
-        const button = document.createElement('button');
-        button.id = 'downloadMergedImageButton';
-        button.textContent = '結合画像 ⬇️';
-        document.body.appendChild(button);
-
-        function addOverlayLines() {
-            const container = document.querySelector('.content-detail');
-            if (!container) return;
-
-            const images = container.querySelectorAll('img');
-            for (let i = 0; i < images.length - 1; i++) {
-                const currentImage = images[i];
-                const nextImage = images[i + 1];
-
-                const gap = nextImage.offsetTop - (currentImage.offsetTop + currentImage.offsetHeight);
-
-                if (gap <= 10) {
-                    const overlay = document.createElement('div');
-                    overlay.className = 'overlay-line';
-                    overlay.style.top = `${currentImage.offsetTop + currentImage.offsetHeight}px`;
-                    overlay.style.width = `${currentImage.offsetWidth}px`;
-                    container.appendChild(overlay);
+        (function initProximity(){
+            const THRESHOLD = 160;
+            let raf = null;
+            function measureNear(x, y){
+                if (!ui.container || isHidden() || isPinned()){
+                    if (ui.container && isPinned()) ui.container.classList.add('near');
+                    return;
                 }
+                const r = ui.container.getBoundingClientRect();
+                const dx = (x < r.left) ? r.left - x : (x > r.right) ? x - r.right : 0;
+                const dy = (y < r.top) ? r.top - y : (y > r.bottom) ? y - r.bottom : 0;
+                const dist = Math.hypot(dx, dy);
+                if (dist <= THRESHOLD) ui.container.classList.add('near');
+                else ui.container.classList.remove('near');
             }
+            function onMove(e){
+                if (raf) cancelAnimationFrame(raf);
+                const x = e.clientX, y = e.clientY;
+                raf = requestAnimationFrame(()=>measureNear(x, y));
+            }
+            window.addEventListener('mousemove', onMove, { passive:true });
+            ui.container.classList.toggle('near', isPinned());
+        })();
+
+        function pickFromSrcset(srcset){
+            try{
+                const items = srcset.split(',').map(s=>s.trim()).map(s=>{
+                    const [url, desc] = s.split(/\s+/);
+                    const score = desc?.endsWith('x') ? parseFloat(desc) :
+                    (desc?.endsWith('w') ? parseFloat(desc) : 1);
+                    return { url, score: isNaN(score) ? 1 : score };
+                }).sort((a,b)=>b.score-a.score);
+                return items[0]?.url || '';
+            }catch{ return ''; }
         }
-
-        button.addEventListener('click', async () => {
-            if (button.classList.contains('processing')) return;
-
-            button.textContent = '処理中…';
-            button.classList.add('processing');
-
-            const images = document.querySelectorAll('.content-detail img');
-            if (images.length === 0) {
-                button.textContent = '画像が見つかりません';
-                button.classList.remove('processing');
-                return;
-            }
-
-            document.querySelectorAll('.content-detail .overlay-line').forEach((line) => line.remove());
-
-            const loadedImages = [];
-            for (const img of images) {
-                const imgUrl = img.src || img.dataset.src;
-                if (imgUrl) {
-                    try {
-                        const image = await loadImage(imgUrl);
-                        loadedImages.push(image);
-                    } catch (err) {
-                        err('画像のロードに失敗:', imgUrl, err);
-                    }
-                }
-            }
-
-            if (loadedImages.length === 0) {
-                button.textContent = 'ロード失敗';
-                button.classList.remove('processing');
-                return;
-            }
-
-            const mergedCanvas = mergeImages(loadedImages);
-            if (!mergedCanvas) {
-                button.textContent = '結合失敗';
-                button.classList.remove('processing');
-                return;
-            }
-
-            const link = document.createElement('a');
-            link.download = 'merged_image.jpg';
-            link.href = mergedCanvas.toDataURL('image/jpeg');
-            link.click();
-
-            button.textContent = 'ダウンロード開始！';
-            button.classList.remove('processing');
-            button.classList.add('complete');
-
-            setTimeout(() => {
-                button.textContent = '結合画像 ⬇️';
-                button.classList.remove('complete');
-            }, 3000);
-        });
-
-        function loadImage(url) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => resolve(img);
-                img.onerror = (err) => reject(err);
-                img.src = url;
+        function resolveImgUrl(img){
+            return (
+                img.currentSrc ||
+                img.src ||
+                img.getAttribute('data-src') ||
+                img.getAttribute('data-original') ||
+                img.getAttribute('data-lazy') ||
+                (img.getAttribute('srcset') ? pickFromSrcset(img.getAttribute('srcset')) : '') ||
+                ''
+            );
+        }
+        function loadImage(url){
+            return new Promise((resolve, reject)=>{
+                const im = new Image();
+                im.crossOrigin = 'anonymous';
+                im.onload = ()=>resolve(im);
+                im.onerror = reject;
+                im.src = url;
             });
         }
-
-        function mergeImages(images) {
+        function mergeImages(images){
+            if (!images.length) return null;
+            const maxW = Math.max(...images.map(i => i.naturalWidth || i.width || 0));
+            const totalH = images.reduce((s,i)=> s + (i.naturalHeight || i.height || 0), 0);
             const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-
-            const width = Math.max(...images.map((img) => img.width));
-            const totalHeight = images.reduce((sum, img) => sum + img.height, 0);
-            canvas.width = width;
-            canvas.height = totalHeight;
-
-            let yOffset = 0;
-            for (const img of images) {
-                context.drawImage(img, 0, yOffset, img.width, img.height);
-                yOffset += img.height;
+            const ctx = canvas.getContext('2d');
+            canvas.width = maxW; canvas.height = totalH;
+            let y = 0;
+            for (const i of images){
+                const w = i.naturalWidth || i.width;
+                const h = i.naturalHeight || i.height;
+                ctx.drawImage(i, 0, y, w, h);
+                y += h;
             }
-
             return canvas;
         }
-
-        function updateOverlayLines() {
-            const container = document.querySelector('.content-detail');
-            if (!container) return;
-
-            container.querySelectorAll('.overlay-line').forEach((line) => line.remove());
-
-            const images = container.querySelectorAll('img');
-            for (let i = 0; i < images.length - 1; i++) {
-                const currentImage = images[i];
-                const nextImage = images[i + 1];
-
-                const gap = nextImage.offsetTop - (currentImage.offsetTop + currentImage.offsetHeight);
-
-                if (gap <= 10) {
-                    const overlay = document.createElement('div');
-                    overlay.className = 'overlay-line';
-                    overlay.style.top = `${currentImage.offsetTop + currentImage.offsetHeight - container.scrollTop}px`;
-                    overlay.style.width = `${currentImage.offsetWidth}px`;
-                    container.appendChild(overlay);
-                }
+        function deepQueryAll(root, selector){
+            const out = Array.from(root.querySelectorAll(selector));
+            for (const el of root.querySelectorAll('*')){
+                if (el.shadowRoot) out.push(...deepQueryAll(el.shadowRoot, selector));
             }
+            return out;
+        }
+        function getCandidateRoots(){
+            const roots = [];
+            const classic = document.querySelector('.content-detail');
+            if (classic) roots.push(classic);
+            document.querySelectorAll('.html-description').forEach(h=>{
+                if (h.shadowRoot) roots.push(h.shadowRoot);
+                else roots.push(h);
+            });
+            document.querySelectorAll('template[shadowrootmode="open"]').forEach(tpl=>{
+                if (tpl.content) roots.push(tpl.content);
+            });
+            if (!roots.length) roots.push(document);
+            return roots;
+        }
+        async function collectAndLoadImages(){
+            const roots = getCandidateRoots();
+            const imgEls = [];
+            for (const r of roots) imgEls.push(...deepQueryAll(r, 'img'));
+            const uniq = Array.from(new Set(imgEls));
+            const loaded = [];
+            for (const el of uniq){
+                const url = resolveImgUrl(el);
+                if (!url) continue;
+                try{
+                    const im = await loadImage(url);
+                    if (im.naturalWidth && im.naturalHeight) loaded.push(im);
+                }catch{ /* skip */ }
+            }
+            return loaded;
         }
 
-        document.addEventListener('scroll', updateOverlayLines);
+        ui.mergeBtn.addEventListener('click', async ()=>{
+            if (ui.mergeBtn.classList.contains('processing')) return;
+            ui.mergeBtn.textContent = '処理中…';
+            ui.mergeBtn.classList.add('processing');
 
-        window.addEventListener('load', () => {
-            window.setTimeout(() => {
-                addOverlayLines();
-            }, 500);
-        });
+            try{
+                const images = await collectAndLoadImages();
+                if (!images.length){
+                    ui.mergeBtn.textContent = '画像が見つかりません';
+                    ui.mergeBtn.classList.remove('processing');
+                    return;
+                }
+                const canvas = mergeImages(images);
+                if (!canvas){
+                    ui.mergeBtn.textContent = '結合失敗';
+                    ui.mergeBtn.classList.remove('processing');
+                    return;
+                }
+                const a = document.createElement('a');
+                a.download = 'merged_image.jpg';
+                a.href = canvas.toDataURL('image/jpeg');
+                a.click();
+                ui.mergeBtn.textContent = 'ダウンロード開始！';
+                ui.mergeBtn.classList.remove('processing');
+                ui.mergeBtn.classList.add('complete');
+            }catch(e){
+                ui.mergeBtn.textContent = 'エラー';
+                ui.mergeBtn.classList.remove('processing');
+            }
+            setTimeout(()=>{
+                ui.mergeBtn.textContent = '結合画像 ⬇️';
+                ui.mergeBtn.classList.remove('complete');
+            }, 3000);
+        }, { passive:true });
     }
 
     function imgSizeCheck(){
@@ -7307,12 +7317,10 @@ transition: all 0.3s ease-in-out;
         style.appendChild(document.createTextNode(css));
         document.head.appendChild(style);
 
-        //タブタイトル変更
         let path = window.location.pathname;
         let productID = path.split('/').pop();
         document.title = `${productID} / Plusnao Web System`;
 
-        // テンプレ画像機能
         var newButton = document.createElement('button');
         newButton.type = 'button';
         newButton.className = 'btn btn-sm btn-default';
@@ -9265,8 +9273,8 @@ transition: all 0.3s ease-in-out;
         function detectSaveButtons() {
             const buttons = document.querySelectorAll('div.row10.mb10 button.btn.btn-primary');
             saveButton = Array.from(buttons).find(btn =>
-                btn.textContent.includes('項目名保存') || btn.textContent === '保存'
-            ) || null;
+                                                  btn.textContent.includes('項目名保存') || btn.textContent === '保存'
+                                                 ) || null;
 
             modalSaveButtons = Array.from(document.querySelectorAll('div.modal-footer button.btn-primary'))
                 .filter(btn => btn.textContent.includes('保存'));
@@ -9473,17 +9481,104 @@ transition: all 0.3s ease-in-out;
 
     }
 
-    function denpyoUpdateGuard(){
+    function denpyoUpdateGuard() {
+
+        const CAL_URL = "https://starlight.plusnao.co.jp/json/calendar-data.json";
+        const CAL_KEY = "doukon_calendar_map_v1";
+        const CAL_META_KEY = "doukon_calendar_meta_v1";
+        let calendarMap = null;
+
+        function toJST(d = new Date()) {
+            return new Date(d.getTime() + (9 * 60 + d.getTimezoneOffset()) * 60 * 1000);
+        }
+        function ymd(date, sep = "-") {
+            const d = toJST(date);
+            const yyyy = d.getFullYear();
+            const mm = ("0" + (d.getMonth() + 1)).slice(-2);
+            const dd = ("0" + d.getDate()).slice(-2);
+            return `${yyyy}${sep}${mm}${sep}${dd}`;
+        }
+        function loadCache() { try { return JSON.parse(GM_getValue(CAL_KEY, "{}")); } catch { return {}; } }
+        function loadMeta() { try { return JSON.parse(GM_getValue(CAL_META_KEY, "{}")); } catch { return {}; } }
+        function saveMeta(meta) { GM_setValue(CAL_META_KEY, JSON.stringify(meta)); }
+        function saveCache(map, meta) { GM_setValue(CAL_KEY, JSON.stringify(map)); saveMeta(meta); calendarMap = map; }
+        function getHeader(headersText, name) {
+            const m = (headersText || "").match(new RegExp("^" + name + ":\\s*(.+)$", "im"));
+            return m ? m[1].trim() : "";
+        }
+        function normalizeMap(raw) {
+            let obj; try { obj = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { return null; }
+            if (!obj || typeof obj !== "object") return null;
+            const out = {};
+            for (const [k, v] of Object.entries(obj)) {
+                if (/^\d{4}-\d{2}-\d{2}$/.test(k) && (v === 0 || v === -1)) out[k] = v;
+            }
+            return Object.keys(out).length ? out : null;
+        }
+        function fetchCalendarOncePerDay() {
+            const meta = loadMeta();
+            const today = ymd(new Date());
+            const cached = loadCache();
+            calendarMap = cached || {};
+            if (meta.lastChecked === today && cached && Object.keys(cached).length) return;
+
+            const headers = {};
+            if (meta.etag) headers["If-None-Match"] = meta.etag;
+            if (meta.lastModified) headers["If-Modified-Since"] = meta.lastModified;
+
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: CAL_URL,
+                headers,
+                timeout: 10000,
+                onload: (res) => {
+                    try {
+                        if (res.status === 200) {
+                            const map = normalizeMap(res.responseText);
+                            meta.lastChecked = today;
+                            if (map) {
+                                const etag = getHeader(res.responseHeaders, "ETag");
+                                const lastMod = getHeader(res.responseHeaders, "Last-Modified");
+                                if (etag) meta.etag = etag;
+                                if (lastMod) meta.lastModified = lastMod;
+                                saveCache(map, meta);
+                            } else {
+                                saveMeta(meta);
+                            }
+                        } else if (res.status === 304) {
+                            meta.lastChecked = today; saveMeta(meta);
+                            calendarMap = cached || {};
+                        } else {
+                            meta.lastChecked = today; saveMeta(meta);
+                            calendarMap = cached || {};
+                        }
+                    } catch {
+                        meta.lastChecked = today; saveMeta(meta);
+                        calendarMap = cached || {};
+                    }
+                },
+                onerror: () => { const m = loadMeta(); m.lastChecked = today; saveMeta(m); calendarMap = cached || {}; },
+                ontimeout: () => { const m = loadMeta(); m.lastChecked = today; saveMeta(m); calendarMap = cached || {}; }
+            });
+        }
+        function isBusinessDay(date) {
+            if (!calendarMap) calendarMap = loadCache() || {};
+            const key = ymd(date, "-");
+            if (Object.prototype.hasOwnProperty.call(calendarMap, key)) {
+                return calendarMap[key] === -1;
+            }
+            const d = toJST(date).getDay();
+            return d !== 0 && d !== 6;
+        }
+
+        fetchCalendarOncePerDay();
 
         function isBusinessHours() {
-            const now = new Date();
-            const nowJST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-
-            const day = nowJST.getDay();
+            const nowJST = toJST(new Date());
             const hour = nowJST.getHours();
             const minute = nowJST.getMinutes();
 
-            const isWeekday = day >= 1 && day <= 5;
+            const isWeekday = isBusinessDay(nowJST);
 
             const totalMinutes = hour * 60 + minute;
             const startMinutes = 7 * 60;
@@ -11025,6 +11120,100 @@ transition: all 0.3s ease-in-out;
 
     function doukonCheck(){
 
+        const CAL_URL = "https://starlight.plusnao.co.jp/json/calendar-data.json";
+        const CAL_KEY = "doukon_calendar_map_v1";
+        const CAL_META_KEY = "doukon_calendar_meta_v1";
+        let calendarMap = null;
+
+        function toJST(d = new Date()) {
+            return new Date(d.getTime() + (9 * 60 + d.getTimezoneOffset()) * 60 * 1000);
+        }
+        function ymd(date, sep = "-") {
+            const d = toJST(date);
+            const yyyy = d.getFullYear();
+            const mm = ("0" + (d.getMonth() + 1)).slice(-2);
+            const dd = ("0" + d.getDate()).slice(-2);
+            return `${yyyy}${sep}${mm}${sep}${dd}`;
+        }
+        function loadCache() { try { return JSON.parse(GM_getValue(CAL_KEY, "{}")); } catch { return {}; } }
+        function loadMeta() { try { return JSON.parse(GM_getValue(CAL_META_KEY, "{}")); } catch { return {}; } }
+        function saveMeta(meta) { GM_setValue(CAL_META_KEY, JSON.stringify(meta)); }
+        function saveCache(map, meta) { GM_setValue(CAL_KEY, JSON.stringify(map)); saveMeta(meta); calendarMap = map; }
+        function getHeader(headersText, name) {
+            const m = (headersText || "").match(new RegExp("^" + name + ":\\s*(.+)$", "im"));
+            return m ? m[1].trim() : "";
+        }
+        function normalizeMap(raw) {
+            let obj; try { obj = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { return null; }
+            if (!obj || typeof obj !== "object") return null;
+            const out = {};
+            for (const [k, v] of Object.entries(obj)) {
+                if (/^\d{4}-\d{2}-\d{2}$/.test(k) && (v === 0 || v === -1)) out[k] = v;
+            }
+            return Object.keys(out).length ? out : null;
+        }
+
+        // 1日1回だけ取得。失敗時は保存分で継続
+        function fetchCalendarOncePerDay() {
+            const meta = loadMeta();
+            const today = ymd(new Date());
+            const cached = loadCache();
+            calendarMap = cached || {};
+
+            if (meta.lastChecked === today && cached && Object.keys(cached).length) return;
+
+            const headers = {};
+            if (meta.etag) headers["If-None-Match"] = meta.etag;
+            if (meta.lastModified) headers["If-Modified-Since"] = meta.lastModified;
+
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: CAL_URL,
+                headers,
+                timeout: 10000,
+                onload: (res) => {
+                    try {
+                        if (res.status === 200) {
+                            const map = normalizeMap(res.responseText);
+                            meta.lastChecked = today;
+                            if (map) {
+                                const etag = getHeader(res.responseHeaders, "ETag");
+                                const lastMod = getHeader(res.responseHeaders, "Last-Modified");
+                                if (etag) meta.etag = etag;
+                                if (lastMod) meta.lastModified = lastMod;
+                                saveCache(map, meta);
+                            } else {
+                                saveMeta(meta);
+                            }
+                        } else if (res.status === 304) {
+                            meta.lastChecked = today; saveMeta(meta);
+                            calendarMap = cached || {};
+                        } else {
+                            meta.lastChecked = today; saveMeta(meta);
+                            calendarMap = cached || {};
+                        }
+                    } catch {
+                        meta.lastChecked = today; saveMeta(meta);
+                        calendarMap = cached || {};
+                    }
+                },
+                onerror: () => { const m = loadMeta(); m.lastChecked = today; saveMeta(m); calendarMap = cached || {}; },
+                ontimeout: () => { const m = loadMeta(); m.lastChecked = today; saveMeta(m); calendarMap = cached || {}; }
+            });
+        }
+
+        function isWorkingDay(date) {
+            if (!calendarMap) calendarMap = loadCache() || {};
+            const key = ymd(date, "-");
+            if (Object.prototype.hasOwnProperty.call(calendarMap, key)) {
+                return calendarMap[key] === -1;
+            }
+            const d = toJST(date).getDay();
+            return d !== 0 && d !== 6;
+        }
+
+        fetchCalendarOncePerDay();
+
         const headerTrId = "doukon_tablene_header";
         const customColClass = "chk-doukon-col";
         const targetShrinkColIndex = 7;
@@ -11062,44 +11251,22 @@ transition: all 0.3s ease-in-out;
                 a.nyukinOK === b.nyukinOK &&
                 a.siharaiOK === b.siharaiOK &&
                 a.meisaiOK === b.meisaiOK &&
-                a.meisaiNG === b.meisaiNG
+                a.meisaiNG === b.meisaiNG &&
+                a.zeroQty === b.zeroQty
             );
         }
 
-        const holidays2025 = [
-            '2025-01-01', // 元日
-            '2025-01-13', // 成人の日
-            '2025-02-11', // 建国記念の日
-            '2025-02-23', // 天皇誕生日
-            '2025-02-24', // 振替休日
-            '2025-03-20', // 春分の日
-            '2025-04-29', // 昭和の日
-            '2025-05-03', // 憲法記念日
-            '2025-05-04', // みどりの日
-            '2025-05-05', // こどもの日
-            '2025-05-06', // 振替休日
-            '2025-07-21', // 海の日
-            '2025-08-11', // 山の日
-            '2025-09-15', // 敬老の日
-            '2025-09-23', // 秋分の日
-            '2025-10-13', // スポーツの日
-            '2025-11-03', // 文化の日
-            '2025-11-23', // 勤労感謝の日
-            '2025-11-24', // 振替休日
-        ];
-
         function getNextWorkingDay(fromDate) {
             let date = new Date(fromDate.getTime());
-            while (true) {
+            for (let i = 0; i < 370; i++) {
                 date.setDate(date.getDate() + 1);
-                const yyyy = date.getFullYear();
-                const mm = ('0' + (date.getMonth() + 1)).slice(-2);
-                const dd = ('0' + date.getDate()).slice(-2);
-                const dateStr = `${yyyy}-${mm}-${dd}`;
-                if (date.getDay() === 0 || date.getDay() === 6) continue;
-                if (holidays2025.includes(dateStr)) continue;
-                return `${yyyy}/${mm}/${dd}`;
+                if (isWorkingDay(date)) {
+                    return ymd(date, "/");
+                }
             }
+            const fallback = new Date(fromDate.getTime());
+            fallback.setDate(fallback.getDate() + 1);
+            return ymd(fallback, "/");
         }
 
         function showBanner(msg) {
@@ -11570,12 +11737,14 @@ transition: all 0.3s ease-in-out;
                 if (btn) {
                     btn._meisaiOK = !!event.data.isAllMatch;
                     btn._meisaiNG = !!event.data.hasSetItem;
+                    btn._zeroQty = !!event.data.hasZeroQty;
                     const prevStatus = denpyoStatusMap[num];
                     const newStatus = {
                         nyukinOK: btn._nyukinOK,
                         siharaiOK: btn._siharaiOK,
                         meisaiOK: btn._meisaiOK,
                         meisaiNG: btn._meisaiNG,
+                        zeroQty: btn._zeroQty,
                     };
                     if (isStatusEqual(prevStatus, newStatus)) return;
                     denpyoStatusMap[num] = newStatus;
@@ -11660,6 +11829,7 @@ transition: all 0.3s ease-in-out;
                 btn._siharaiOK = status.siharaiOK;
                 btn._meisaiOK = status.meisaiOK;
                 btn._meisaiNG = status.meisaiNG;
+                btn._zeroQty = status.zeroQty;
 
                 let bg = "#fff", border = "#b3b3b3", svgColor = "#666";
                 let issues = [];
@@ -11673,6 +11843,7 @@ transition: all 0.3s ease-in-out;
                     btn._nyukinOK === false ||
                     btn._siharaiOK === false ||
                     btn._meisaiOK === false ||
+                    btn._zeroQty === true ||
                     parentBlacklisted ||
                     parentHasSetItem
                 ) {
@@ -11683,6 +11854,7 @@ transition: all 0.3s ease-in-out;
                     if (btn._siharaiOK === false) issues.push("■支払方法の不一致");
                     if (btn._meisaiOK === false) issues.push("■候補先が引きあたっていない");
                     if (btn._meisaiNG === true) issues.push("■候補先がセット商品");
+                    if (btn._zeroQty === true) issues.push("■受注数が0件");
                     if (mallHoldMap[num]) issues.push("■候補先のタグにモール保留");
                     if (parentBlacklisted) issues.push("■同梱禁止ブラックリストに該当");
                     if (parentHasSetItem) issues.push("■同梱先がセット商品");
@@ -11888,6 +12060,7 @@ transition: all 0.3s ease-in-out;
                         st.siharaiOK === true &&
                         st.meisaiOK === true &&
                         st.meisaiNG !== true &&
+                        st.zeroQty !== true &&
                         mallHoldMap[num] !== true &&
                         !isParentNameBlacklisted()
                     );
@@ -12035,6 +12208,7 @@ transition: all 0.3s ease-in-out;
 
                         let isAllMatch = true;
                         let hasSetItem = false;
+                        let hasZeroQty = false;
                         for (let i = 1; i < rows.length; i++) {
                             const tds = rows[i].querySelectorAll("td");
                             if (tds.length < 13) continue;
@@ -12043,6 +12217,10 @@ transition: all 0.3s ease-in-out;
 
                             const orderQty = tds[6].textContent.trim();
                             const hikiateQty = tds[7].textContent.trim();
+
+                            if (orderQty === "0") {
+                                hasZeroQty = true;
+                            }
 
                             if (orderQty !== hikiateQty) {
                                 isAllMatch = false;
@@ -12060,7 +12238,8 @@ transition: all 0.3s ease-in-out;
                                 type: "meisaiJudge",
                                 denpyoNo,
                                 isAllMatch,
-                                hasSetItem
+                                hasSetItem,
+                                hasZeroQty
                             },
                             "*"
                         );
@@ -13115,8 +13294,7 @@ transition: all 0.3s ease-in-out;
         });
     }
 
-    function enable1688GuestView(){
-
+    function enable1688GuestView() {
         const STYLE_ID = 'tm-1688-guest-style';
 
         function isGuest() {
@@ -13129,45 +13307,654 @@ transition: all 0.3s ease-in-out;
             const s = document.createElement('style');
             s.id = STYLE_ID;
             s.textContent = `
-      /* ゲスト時だけON */
-      :root[data-tm-guest="1"] #submitOrder { display: none !important; }
-      :root[data-tm-guest="1"] .module-login-bar.v-flex.center { display: none !important; }
-      :root[data-tm-guest="1"] .collapse-footer { display: none !important; }
+:root[data-tm-guest="1"] #submitOrder { display: none !important; }
+:root[data-tm-guest="1"] .module-login-bar.v-flex.center { display: none !important; }
+:root[data-tm-guest="1"] .collapse-footer { display: none !important; }
 
-      :root[data-tm-guest="1"] .module-od-cart-sider .cart-sider {
-        --module-side-cart-width: calc(100% - 20px);
-      }
+:root[data-tm-guest="1"] .module-od-sku-selection.od-sku-selection-not-login {
+  height:auto !important; max-height:none !important;
+}
+:root[data-tm-guest="1"] .antd-external-collapse.collapse-body,
+:root[data-tm-guest="1"] #description .collapse-body {
+  height:auto !important; max-height:none !important;
+}
 
-      /* 未ログイン専用のSKU制限を無効化 */
-      :root[data-tm-guest="1"] .module-od-sku-selection.od-sku-selection-not-login {
-        height: auto !important;
-        overflow: visible !important;
-        max-height: none !important;
-      }
+:root[data-tm-guest="1"] #mainPrice,
+:root[data-tm-guest="1"] #mainPrice .price-comp,
+:root[data-tm-guest="1"] .module-od-main-price,
+:root[data-tm-guest="1"] .od-price-wrap,
+:root[data-tm-guest="1"] .od-pc-main-info,
+:root[data-tm-guest="1"] .od-detail-info {
+  height:auto !important; max-height:none !important;
+}
 
-      /* 画像ブロックの折りたたみ解除 */
-      :root[data-tm-guest="1"] .antd-external-collapse.collapse-body,
-      :root[data-tm-guest="1"] #description .collapse-body {
-        height: auto !important;
-        max-height: none !important;
-       overflow-y: visible !important;
-       overflow: visible !important;
-     }
-    `;
+:root[data-tm-guest="1"] .hp-badge{
+  margin-right:10px; padding:1px 6px; border-radius:999px; background:#ff4000; color:#fff;
+  font:12px/18px system-ui,sans-serif; display:inline-block; vertical-align:middle; white-space:nowrap;
+}
+
+:root[data-tm-guest="1"] .hp-range{
+  display:inline-block; padding:2px 8px; border-radius:10px;
+  font:600 16px/20px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  letter-spacing:.2px; color:#fff; background:#ff4000; border:1px solid rgba(0,0,0,.08);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35); -webkit-font-smoothing:antialiased; white-space:nowrap;
+}
+
+:root[data-tm-guest="1"] .hp-range-host{
+  display:block; margin-left:6px; padding:0; white-space:normal;
+  pointer-events:auto; cursor:default; user-select:text;
+}
+
+:root[data-tm-guest="1"] .hp-moq{
+  display:inline-flex; flex-wrap:wrap; align-items:flex-start; gap:6px 8px;
+  margin:4px 0 4px 8px; max-width:100%;
+}
+:root[data-tm-guest="1"] .hp-moq-chip{
+  display:inline-block; padding:2px 8px; border-radius:10px;
+  font:600 13px/20px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  color:#fff; background:#656565; border:1px solid rgba(255,255,255,.15); white-space:nowrap;
+}
+:root[data-tm-guest="1"] .hp-moq-more{
+  display:inline-block; padding:2px 8px; border-radius:10px; border:1px dashed rgba(0,0,0,.25);
+  font:600 12px/20px system-ui,sans-serif; background:transparent; cursor:pointer;
+}
+:root[data-tm-guest="1"] .hp-moq[data-collapsed="1"] .hp-moq-chip[data-overflow="1"]{ display:none !important; }
+
+:root[data-tm-guest="1"] .hp-stealth { opacity:0.01 !important; }
+:root[data-tm-guest="1"].hp-stealth-all,
+:root[data-tm-guest="1"].hp-stealth-all * { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+:root[data-tm-guest="1"].hp-stealth-all [data-module*="photo"],
+:root[data-tm-guest="1"].hp-stealth-all #mod-detail-gallery,
+:root[data-tm-guest="1"].hp-stealth-all [id*="gallery"],
+:root[data-tm-guest="1"].hp-stealth-all [class*="gallery"],
+:root[data-tm-guest="1"].hp-stealth-all [class*="image-viewer"],
+:root[data-tm-guest="1"].hp-stealth-all [class*="main-image"],
+:root[data-tm-guest="1"].hp-stealth-all [class*="preview"]{ visibility:hidden !important; }
+:root[data-tm-guest="1"].hp-stealth-all .transverse-filter{ pointer-events:none !important; }
+:root[data-tm-guest="1"].hp-stealth-all .sku-filter-button,
+:root[data-tm-guest="1"].hp-stealth-all .sku-filter-button *{ transition:none !important; animation:none !important; filter:none !important; }
+:root[data-tm-guest="1"].hp-stealth-all .sku-filter-button.active,
+:root[data-tm-guest="1"].hp-stealth-all .sku-filter-button.selected,
+:root[data-tm-guest="1"].hp-stealth-all .sku-filter-button.is-selected,
+:root[data-tm-guest="1"].hp-stealth-all .sku-filter-button[aria-checked="true"],
+:root[data-tm-guest="1"].hp-stealth-all .sku-filter-button.active .label-image-wrap,
+:root[data-tm-guest="1"].hp-stealth-all .sku-filter-button.active .prop-img{
+  outline:none !important; box-shadow:none !important; border-color:transparent !important;
+  filter:none !important; background:inherit !important; color:inherit !important;
+}
+`;
             document.head.appendChild(s);
         }
+
+        const guestFeature = (() => {
+            let depMo=null, mpMo=null, bodyMo=null, scheduled=false;
+            let INTERNAL_SWITCHING=false;
+
+            const unclippedNodes = new Set();
+
+            const state = {
+                harvesting:false, rerun:false, globalMin:null, globalMax:null, lastSig:'', lastHarvestAt:0,
+                moqTiers:[]
+            };
+
+            const qs=(s,root=document)=>root.querySelector(s);
+            const qsa=(s,root=document)=>Array.from(root.querySelectorAll(s));
+            const normalize=(s)=>String(s||'').replace(/\s+/g,' ').replace(/\u3000/g,' ').trim();
+            const rafOnce=()=>new Promise(r=>requestAnimationFrame(()=>r()));
+            const raf2=async()=>{ await rafOnce(); await rafOnce(); };
+
+            const SEL = {
+                depListContainer: '.expand-view-list',
+                depListItem:      '.expand-view-item',
+                depListItemLabel: '.item-label',
+                depListPrice:     '.item-price-stock',
+                mainPrice:        '#mainPrice',
+                mainPriceLead:    '#mainPrice .unlogin-lead',
+                mainPriceHost:    '#mainPrice .hp-range-host',
+                parentModule:     '.feature-item',
+                parentItemButton: '.transverse-filter .sku-filter-button',
+                activeButton:     '.sku-filter-button.active',
+                parentItemLabel:  '.label-name',
+            };
+
+            const fmtYuan = (n)=>`¥ ${Number(n).toFixed(2)}`;
+            function parsePriceNum(text){ const m = String(text||'').match(/(\d+(?:\.\d+)?)/); return m ? Number(m[1]) : NaN; }
+
+            function isFramedContainer(el) {
+                const cs = getComputedStyle(el);
+                const hasBorder =
+                      parseFloat(cs.borderTopWidth)  > 0 ||
+                      parseFloat(cs.borderRightWidth)> 0 ||
+                      parseFloat(cs.borderBottomWidth)>0 ||
+                      parseFloat(cs.borderLeftWidth) > 0;
+                const hasShadow = !!cs.boxShadow && cs.boxShadow !== 'none';
+                const hasOutline = !!cs.outlineStyle && cs.outlineStyle !== 'none';
+                const bg = cs.backgroundColor;
+                const opaqueBg = bg && bg !== 'transparent' && !/rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/i.test(bg);
+                return hasBorder || hasShadow || hasOutline || opaqueBg;
+            }
+            function isScrollContainer(el){
+                const cs = getComputedStyle(el);
+                const oy = cs.overflowY;
+                const ox = cs.overflowX;
+                const scrollish = (v)=> v === 'auto' || v === 'scroll';
+                return scrollish(oy) || scrollish(ox);
+            }
+            function rememberInline(el, key) {
+                const dataKey = 'hpUnclip' + key[0].toUpperCase() + key.slice(1);
+                if (el.dataset[dataKey] === undefined) {
+                    el.dataset[dataKey] = el.style[key] || '';
+                    unclippedNodes.add(el);
+                }
+            }
+            function restoreInline(el, key) {
+                const dataKey = 'hpUnclip' + key[0].toUpperCase() + key.slice(1);
+                if (el.dataset[dataKey] !== undefined) {
+                    el.style[key] = el.dataset[dataKey];
+                    delete el.dataset[dataKey];
+                }
+            }
+            function unlockHeights(el) {
+                rememberInline(el, 'height');
+                rememberInline(el, 'maxHeight');
+                el.style.height = 'auto';
+                el.style.maxHeight = 'none';
+            }
+            function softenOverflow(el) {
+                if (isFramedContainer(el)) return;
+                if (isScrollContainer(el)) return;
+                rememberInline(el, 'overflow');         el.style.overflow  = 'visible';
+                rememberInline(el, 'overflowX');        el.style.overflowX = 'visible';
+                rememberInline(el, 'overflowY');        el.style.overflowY = 'visible';
+            }
+            function ensureUnclippedFor(node){
+                if(!node) return;
+                let p = node.parentElement;
+                let hops = 0;
+                while(p && hops < 10){
+                    const cs = getComputedStyle(p);
+
+                    const heightLimited =
+                          (cs.maxHeight !== 'none' && p.scrollHeight > p.clientHeight + 1) ||
+                          (cs.height !== 'auto' && p.scrollHeight > p.clientHeight + 1);
+                    if (heightLimited) {
+                        unlockHeights(p);
+                        if (p.scrollHeight > p.clientHeight + 1) softenOverflow(p);
+                        if (p.id === 'mainPrice') break;
+                        break;
+                    }
+
+                    const overflowCuts =
+                          (cs.overflowY === 'hidden' || cs.overflowY === 'clip' ||
+                           cs.overflowX === 'hidden' || cs.overflowX === 'clip') &&
+                          (p.scrollHeight > p.clientHeight + 1 || p.scrollWidth > p.clientWidth + 1);
+                    if (overflowCuts) {
+                        softenOverflow(p);
+                        if (p.id === 'mainPrice') break;
+                        break;
+                    }
+
+                    if (p.id === 'mainPrice') break;
+                    p = p.parentElement;
+                    hops++;
+                }
+            }
+            function restoreUnclipped(){
+                for(const el of unclippedNodes){
+                    restoreInline(el, 'height');
+                    restoreInline(el, 'maxHeight');
+                    restoreInline(el, 'overflow');
+                    restoreInline(el, 'overflowX');
+                    restoreInline(el, 'overflowY');
+                }
+                unclippedNodes.clear();
+            }
+
+            function collectDependentList(container){
+                if(!container) return [];
+                const rows = container.querySelectorAll(SEL.depListItem);
+                const out = [];
+                for(let i=0;i<rows.length;i++){
+                    const row = rows[i];
+                    const labelEl = row.querySelector(SEL.depListItemLabel);
+                    const label = normalize(labelEl?.getAttribute('title') || labelEl?.textContent || '');
+                    if(!label) continue;
+                    const ps = row.querySelectorAll(SEL.depListPrice);
+                    const t1 = normalize(ps[0]?.textContent || '');
+                    const t2 = normalize(ps[1]?.textContent || '');
+                    const priceText = /[¥￥]/.test(t1) ? t1 : /[¥￥]/.test(t2) ? t2 : (t1 || t2);
+                    const priceNum = parsePriceNum(priceText);
+                    out.push({ index:i, label, priceText, price: isFinite(priceNum)?priceNum:NaN, row });
+                }
+                return out;
+            }
+            function ensureBadgeHost(row){ return row.querySelector(SEL.depListItemLabel)?.parentElement || row; }
+            function annotateBadges(container, items){
+                const map = new Map(items.map(x=>[x.label, x.price]));
+                const rows = container.querySelectorAll(SEL.depListItem);
+                for(const row of rows){
+                    const labelEl = row.querySelector(SEL.depListItemLabel);
+                    const label = normalize(labelEl?.getAttribute('title') || labelEl?.textContent || '');
+                    if(!label) continue;
+                    const priceNum = map.get(label);
+                    const display = isFinite(priceNum) ? `${priceNum} 元` : '-';
+                    const host = ensureBadgeHost(row);
+                    if(!host) continue;
+                    let badge = host.querySelector('.hp-badge');
+                    const current = host.getAttribute('data-hp') || '';
+                    if(current === display) continue;
+                    if(!badge){ badge = document.createElement('span'); badge.className = 'hp-badge'; host.appendChild(badge); }
+                    badge.textContent = display;
+                    host.setAttribute('data-hp', display);
+                }
+            }
+
+            function neutralizeUnloginLead(){
+                const old = qs(SEL.mainPriceLead);
+                if(!old) return null;
+                const host = document.createElement('p');
+                host.className = 'hp-range-host';
+                old.replaceWith(host);
+                return host;
+            }
+            function getRangeHost(){
+                let host = qs(SEL.mainPriceHost);
+                if(host) return host;
+                host = neutralizeUnloginLead();
+                if(host) return host;
+                const parent = qs('#mainPrice .price-comp') || qs('#mainPrice .module-od-main-price') || qs('#mainPrice');
+                if(!parent) return null;
+                host = document.createElement('p');
+                host.className = 'hp-range-host';
+                parent.appendChild(host);
+                return host;
+            }
+
+            function renderMainPriceRange(min, max){
+                const host = getRangeHost();
+                if(!host) return;
+                const min2 = Number(Number(min).toFixed(2));
+                const max2 = Number(Number(max).toFixed(2));
+                let range = host.querySelector('.hp-range');
+                if(min2 === max2){
+                    if(range) range.remove();
+                    host.removeAttribute('data-hp-range');
+                } else {
+                    const text = `${fmtYuan(min2)} ~ ${fmtYuan(max2)}`;
+                    if(!range){
+                        range = document.createElement('span');
+                        range.className = 'hp-range';
+                        host.prepend(range);
+                    }
+                    if(range.textContent !== text){
+                        range.textContent = text;
+                        host.setAttribute('data-hp-range', text);
+                    }
+                }
+                ensureUnclippedFor(host);
+            }
+
+            let moqRO = null;
+            function renderMoqTiers(tiers){
+                const host = getRangeHost();
+                if(!host) return;
+
+                let moq = host.querySelector('.hp-moq');
+                if(!moq){
+                    moq = document.createElement('span');
+                    moq.className = 'hp-moq';
+                    host.appendChild(moq);
+                }
+
+                const prevSig = moq.getAttribute('data-sig') || '';
+                const newSig = String(tiers.join('|'));
+                if(prevSig !== newSig){
+                    moq.innerHTML = '';
+                    moq.setAttribute('data-sig', newSig);
+
+                    const chips = [];
+                    for(const seg of tiers){
+                        const chip = document.createElement('span');
+                        chip.className = 'hp-moq-chip';
+                        chip.textContent = seg;
+                        moq.appendChild(chip);
+                        chips.push(chip);
+                    }
+
+                    moq.removeAttribute('data-collapsed');
+                    chips.forEach(c=>c.removeAttribute('data-overflow'));
+                    const firstTop = chips.length ? chips[0].offsetTop : 0;
+                    let lastVisibleIdx = chips.length - 1;
+                    for(let i=0;i<chips.length;i++){
+                        if(chips[i].offsetTop - firstTop > 24){ lastVisibleIdx = i - 1; break; }
+                    }
+                    if(lastVisibleIdx < chips.length - 1){
+                        moq.setAttribute('data-collapsed','1');
+                        for(let i=lastVisibleIdx+1;i<chips.length;i++) chips[i].setAttribute('data-overflow','1');
+                        const more = document.createElement('button');
+                        more.type = 'button';
+                        more.className = 'hp-moq-more';
+                        more.textContent = `もっと…`;
+                        more.addEventListener('click', ()=>{
+                            const collapsed = moq.getAttribute('data-collapsed') === '1';
+                            if(collapsed){
+                                moq.setAttribute('data-collapsed','0');
+                                chips.forEach(c=>c.removeAttribute('data-overflow'));
+                                more.textContent = '閉じる';
+                            }else{
+                                moq.setAttribute('data-collapsed','1');
+                                for(let i=lastVisibleIdx+1;i<chips.length;i++) chips[i].setAttribute('data-overflow','1');
+                                more.textContent = 'もっと…';
+                            }
+                            ensureUnclippedFor(host);
+                        }, { passive:true });
+                        moq.appendChild(more);
+                    }
+                }
+
+                if(!moqRO){ moqRO = new ResizeObserver(()=>ensureUnclippedFor(host)); }
+                moqRO.disconnect();
+                moqRO.observe(moq);
+                ensureUnclippedFor(host);
+            }
+
+            function findControlModule(){
+                const activeBtn = qs(SEL.activeButton);
+                return activeBtn ? activeBtn.closest(SEL.parentModule) : null;
+            }
+            function findControlButtons(){
+                const m = findControlModule();
+                return m ? qsa(SEL.parentItemButton, m) : [];
+            }
+            function buttonsSignature(btns){
+                const labels = btns.map(b=>normalize(b.querySelector(SEL.parentItemLabel)?.textContent || b.getAttribute('title') || ''));
+                return labels.join('|') + `#${btns.length}`;
+            }
+
+            function setStealth(on){
+                qsa(SEL.depListContainer).forEach(c=>c.classList.toggle('hp-stealth', !!on));
+                document.documentElement.classList.toggle('hp-stealth-all', !!on);
+            }
+
+            async function clickAndRead(btn){
+                btn.click();
+                await raf2();
+                return collectDependentList(qs(SEL.depListContainer));
+            }
+
+            function computeMinMaxFromCombos(combos){
+                let min = Infinity, max = -Infinity;
+                for(const items of combos){
+                    for(const it of items){
+                        if(!isFinite(it.price)) continue;
+                        if(it.price < min) min = it.price;
+                        if(it.price > max) max = it.price;
+                    }
+                }
+                if(!isFinite(min) || !isFinite(max)) return null;
+                return { min, max };
+            }
+
+            const HARVEST_COOLDOWN_MS = 2500;
+            async function harvestAllActives(){
+                const now = Date.now();
+                if(now - state.lastHarvestAt < HARVEST_COOLDOWN_MS) return;
+                state.lastHarvestAt = now;
+                if(state.harvesting){ state.rerun = true; return; }
+                state.harvesting = true; state.rerun = false;
+
+                INTERNAL_SWITCHING = true;
+                setStealth(true);
+
+                try{
+                    const buttons = findControlButtons();
+                    if(!buttons.length) return;
+                    const sig = buttonsSignature(buttons);
+                    if(sig === state.lastSig && isFinite(state.globalMin) && isFinite(state.globalMax)) return;
+                    state.lastSig = sig;
+
+                    const orig = qs(SEL.activeButton);
+                    const combos = [];
+                    combos.push(collectDependentList(qs(SEL.depListContainer)));
+                    for(const btn of buttons){
+                        if(orig && btn === orig) continue;
+                        combos.push(await clickAndRead(btn));
+                    }
+                    if(orig){ orig.click(); await raf2(); }
+
+                    const mm = computeMinMaxFromCombos(combos);
+                    if(mm){
+                        state.globalMin = mm.min;
+                        state.globalMax = mm.max;
+                        renderMainPriceRange(mm.min, mm.max);
+                    }
+                } finally {
+                    setStealth(false);
+                    INTERNAL_SWITCHING = false;
+                    state.harvesting = false;
+                    if(state.rerun){ state.rerun = false; harvestAllActives(); }
+                }
+            }
+
+            function updateBadgesAndMaybeRange(){
+                if(INTERNAL_SWITCHING) return;
+                const container = qs(SEL.depListContainer);
+                if(!container) return;
+                const items = collectDependentList(container);
+                annotateBadges(container, items);
+
+                if(!(isFinite(state.globalMin) && isFinite(state.globalMax))){
+                    const nums = items.map(x=>x.price).filter(isFinite);
+                    if(nums.length){
+                        const min = Math.min(...nums), max = Math.max(...nums);
+                        renderMainPriceRange(min, max);
+                    }
+                } else {
+                    renderMainPriceRange(state.globalMin, state.globalMax);
+                }
+
+                if(state.moqTiers?.length) renderMoqTiers(state.moqTiers);
+            }
+
+            function extractBalancedArray(src, startIdx){
+                let i = startIdx, depth = 0, inStr = false, q = '', esc = false, from = -1;
+                for(; i < src.length; i++){
+                    const ch = src[i];
+                    if(inStr){
+                        if(esc){ esc=false; continue; }
+                        if(ch==='\\'){ esc=true; continue; }
+                        if(ch===q){ inStr=false; continue; }
+                        continue;
+                    }
+                    if(ch==='"' || ch==="'"){ inStr=true; q=ch; continue; }
+                    if(ch==='['){ if(depth===0) from=i; depth++; continue; }
+                    if(ch===']'){ depth--; if(depth===0) return src.slice(from, i+1); continue; }
+                }
+                return null;
+            }
+            function tryJson(text){ try{ return JSON.parse(text); } catch{ return null; } }
+            function pickNearestUnit(scriptText, anchorIdx){
+                const re = /"(unit|saleUnit|priceUnit)"\s*:\s*"([^"]+)"/g;
+                const hits = []; let m;
+                while((m = re.exec(scriptText))){ hits.push({ key:m[1], val:m[2], idx:m.index }); }
+                if(!hits.length) return null;
+                const weight = { unit:0, saleUnit:1, priceUnit:2 };
+                hits.sort((a,b)=>{
+                    const da = Math.abs(a.idx - anchorIdx), db = Math.abs(b.idx - anchorIdx);
+                    if(da !== db) return da - db;
+                    return (weight[a.key]||9) - (weight[b.key]||9);
+                });
+                return hits[0].val || null;
+            }
+            function collectOriginalWithoutPromotion(){
+                const scripts = qsa('script');
+                let best = null;
+                for(const s of scripts){
+                    const t = s.textContent || '';
+                    const k = t.indexOf('"originalPricesWithoutPromotion"');
+                    if(k === -1) continue;
+                    const arrStart = t.indexOf('[', k);
+                    if(arrStart === -1) continue;
+                    const arrText = extractBalancedArray(t, arrStart);
+                    if(!arrText) continue;
+                    const arr = tryJson(arrText);
+                    if(!Array.isArray(arr) || !arr.length) continue;
+                    const unit = pickNearestUnit(t, k) || '件';
+                    if(!best || arr.length > best.arr.length){
+                        best = { arr, unit, anchor:k };
+                    }
+                }
+                return best;
+            }
+            function collectPriceRangesFallback(){
+                const scripts = qsa('script');
+                const keys = ['"offerPriceRanges"', '"disPriceRanges"'];
+                let best = null;
+                for(const s of scripts){
+                    const t = s.textContent || '';
+                    let foundIdx = -1;
+                    for(const key of keys){
+                        const k = t.indexOf(key);
+                        if(k !== -1){ foundIdx = k; break; }
+                    }
+                    if(foundIdx === -1) continue;
+                    const arrStart = t.indexOf('[', foundIdx);
+                    if(arrStart === -1) continue;
+                    const arrText = extractBalancedArray(t, arrStart);
+                    if(!arrText) continue;
+                    const arr = tryJson(arrText);
+                    if(!Array.isArray(arr) || !arr.length) continue;
+                    const unit = pickNearestUnit(t, foundIdx) || '件';
+                    if(!best || arr.length > best.arr.length){
+                        best = { arr, unit, keyHit:'ranges' };
+                    }
+                }
+                return best;
+            }
+            function formatTiersFromOriginal(arr, unit){
+                const rows = (arr||[])
+                .map(x => ({ b: Number(x?.beginAmount), price: String(x?.price ?? '').trim() }))
+                .filter(x => Number.isFinite(x.b))
+                .sort((a,b)=>a.b - b.b);
+                if(!rows.length) return [];
+                const sameAll = rows.every(r => r.b === rows[0].b);
+                if(sameAll) return [`≥${rows[0].b}${unit}`];
+
+                const out = []; const uniq = new Set();
+                for(let i=0;i<rows.length;i++){
+                    const cur = rows[i]; const next = rows[i+1];
+                    const end = next ? (Number(next.b) - 1) : 0;
+                    const lot = end > 0 ? `${cur.b}-${end}${unit}` : `≥${cur.b}${unit}`;
+                    const priceText = cur.price ? (cur.price.startsWith('¥')?cur.price:`¥${cur.price}`) : '';
+                    const seg = `${lot} ${priceText}`.trim();
+                    if(!uniq.has(seg)){ uniq.add(seg); out.push(seg); }
+                }
+                return out;
+            }
+            function formatTiersFromRanges(arr, unit){
+                const rows = (arr||[])
+                .map(x => ({ b:Number(x?.beginAmount), e:Number(x?.endAmount||0), price: String((x?.discountPrice ?? x?.price) ?? '').trim() }))
+                .filter(x => Number.isFinite(x.b))
+                .sort((a,b)=>a.b - b.b);
+                if(!rows.length) return [];
+                const sameAll = rows.every(r => r.b === rows[0].b && (r.e||0)===(rows[0].e||0));
+                if(sameAll){
+                    const r = rows[0]; return [ r.e>0 ? `${r.b}-${r.e}${unit}` : `≥${r.b}${unit}` ];
+                }
+                const out = []; const seen = new Set();
+                for(const r of rows){
+                    const lot = r.e > 0 ? `${r.b}-${r.e}${unit}` : `≥${r.b}${unit}`;
+                    const priceText = r.price ? (r.price.startsWith('¥')?r.price:`¥${r.price}`) : '';
+                    const seg = `${lot} ${priceText}`.trim();
+                    if(!seen.has(seg)){ seen.add(seg); out.push(seg); }
+                }
+                return out;
+            }
+            function updateMoqFromPage(){
+                const ori = collectOriginalWithoutPromotion();
+                if(ori && ori.arr?.length){
+                    const arr = formatTiersFromOriginal(ori.arr, ori.unit || '件');
+                    if(arr.length){ state.moqTiers = arr; renderMoqTiers(arr); return; }
+                }
+                const fb = collectPriceRangesFallback();
+                if(fb && fb.arr?.length){
+                    const arr = formatTiersFromRanges(fb.arr, fb.unit || '件');
+                    if(arr.length){ state.moqTiers = arr; renderMoqTiers(arr); }
+                }
+            }
+
+            function schedule(fn){ if(scheduled) return; scheduled=true; requestAnimationFrame(()=>{ scheduled=false; fn(); }); }
+
+            function install(){
+                if(qs(SEL.depListContainer) && !depMo){
+                    depMo = new MutationObserver(()=>schedule(updateBadgesAndMaybeRange));
+                    depMo.observe(qs(SEL.depListContainer), { childList:true, subtree:true, characterData:true });
+                    updateBadgesAndMaybeRange();
+                }
+                if(qs(SEL.mainPrice) && !mpMo){
+                    mpMo = new MutationObserver(()=>schedule(()=>{
+                        if(qs(SEL.mainPriceLead)) neutralizeUnloginLead();
+                        if(isFinite(state.globalMin) && isFinite(state.globalMax)) renderMainPriceRange(state.globalMin, state.globalMax);
+                        else updateBadgesAndMaybeRange();
+                        if(state.moqTiers?.length) renderMoqTiers(state.moqTiers);
+                    }));
+                    mpMo.observe(qs(SEL.mainPrice), { childList:true, subtree:true, characterData:true });
+                    if(qs(SEL.mainPriceLead)) neutralizeUnloginLead();
+                }
+                if(!bodyMo){
+                    bodyMo = new MutationObserver(()=>{
+                        if(qs(SEL.depListContainer) && !depMo) {
+                            depMo = new MutationObserver(()=>schedule(updateBadgesAndMaybeRange));
+                            depMo.observe(qs(SEL.depListContainer), { childList:true, subtree:true, characterData:true });
+                            updateBadgesAndMaybeRange();
+                        }
+                        if(qs(SEL.mainPrice) && !mpMo){
+                            mpMo = new MutationObserver(()=>schedule(()=>{
+                                if(qs(SEL.mainPriceLead)) neutralizeUnloginLead();
+                                if(isFinite(state.globalMin) && isFinite(state.globalMax)) renderMainPriceRange(state.globalMin, state.globalMax);
+                                else updateBadgesAndMaybeRange();
+                                if(state.moqTiers?.length) renderMoqTiers(state.moqTiers);
+                            }));
+                            mpMo.observe(qs(SEL.mainPrice), { childList:true, subtree:true, characterData:true });
+                            if(qs(SEL.mainPriceLead)) neutralizeUnloginLead();
+                        }
+                        const btns = findControlButtons();
+                        const sigNow = buttonsSignature(btns);
+                        if(sigNow && sigNow !== state.lastSig) schedule(()=>harvestAllActives());
+                        if(!state.moqTiers?.length) updateMoqFromPage();
+                    });
+                    bodyMo.observe(document.body, { childList:true, subtree:true });
+                }
+                ensureUnclippedFor(qs(SEL.mainPrice) || getRangeHost());
+                harvestAllActives();
+                updateMoqFromPage();
+            }
+
+            function uninstall(){
+                depMo?.disconnect(); depMo=null;
+                mpMo?.disconnect(); mpMo=null;
+                bodyMo?.disconnect(); bodyMo=null;
+                restoreUnclipped();
+                document.documentElement.classList.remove('hp-stealth-all');
+                qsa(SEL.depListContainer).forEach(c=>c.classList.remove('hp-stealth'));
+                state.harvesting=false; state.rerun=false; INTERNAL_SWITCHING=false;
+            }
+
+            return { install, uninstall };
+        })();
 
         function applyMode() {
             ensureStyle();
             const root = document.documentElement;
             if (isGuest()) {
                 root.setAttribute('data-tm-guest', '1');
+                guestFeature.install();
             } else {
-                root.removeAttribute('data-tm-guest'); // ログイン時はOFF
+                guestFeature.uninstall();
+                root.removeAttribute('data-tm-guest');
             }
         }
 
-        // 変化をまとめて処理
         const scheduleApply = (() => {
             let raf = 0;
             return () => {
@@ -13179,12 +13966,7 @@ transition: all 0.3s ease-in-out;
         function boot() {
             applyMode();
             const mo = new MutationObserver(scheduleApply);
-            mo.observe(document.body, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['class']
-            });
+            mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
             window.addEventListener('hashchange', scheduleApply, { passive: true });
             window.addEventListener('popstate', scheduleApply, { passive: true });
         }
@@ -13201,4 +13983,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: bd7604b098d319604a81805561a3e0bc605744648294f0f128fb89a4a557466c
+// @integrity-hash: b38df38f88d3997f0341aa7c35c3f56de1316ce2ec539e0fb7ea28844f1d5f6f
