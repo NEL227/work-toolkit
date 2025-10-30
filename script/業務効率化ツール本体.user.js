@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.9.1.1
+// @version      1.9.1.2
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -5058,7 +5058,7 @@ transition: all 0.3s ease-in-out;
 
   .checkboxList {
     position: fixed; top: 30px; right: 10px; background-color: white; border: 1px solid #ccc;
-    padding: 20px 15px 15px 15px; max-height: 90vh; overflow-y: auto; z-index: 2000;
+    padding: 20px 15px 15px 15px; max-height: 90vh; overflow-y: auto; z-index: 10000;
     font-size: 15px; min-width: 230px; box-shadow: 0 0 10px rgba(0,0,0,0.2);
   }
   .checkboxList label { display: block; white-space: nowrap; }
@@ -14004,4 +14004,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: 4b08a12741bc84f7abb883b29746e91390f6165d8ead4b379bffa8a818a1e09a
+// @integrity-hash: 47436cfd8842571e4c53f13e6a4253d7219f15cd2e61c032ba47428bc213bb93
