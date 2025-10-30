@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.9.0
+// @version      1.9.1
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -13330,7 +13330,7 @@ transition: all 0.3s ease-in-out;
 
 :root[data-tm-guest="1"] .hp-badge{
   margin-right:10px; padding:1px 6px; border-radius:999px; background:#ff4000; color:#fff;
-  font:12px/18px system-ui,sans-serif; display:inline-block; vertical-align:middle; white-space:nowrap;
+  font:700 13px/18px system-ui,sans-serif; display:inline-block; vertical-align:middle; white-space:nowrap;
 }
 
 :root[data-tm-guest="1"] .hp-range{
@@ -13720,7 +13720,28 @@ transition: all 0.3s ease-in-out;
                         if(orig && btn === orig) continue;
                         combos.push(await clickAndRead(btn));
                     }
-                    if(orig){ orig.click(); await raf2(); }
+    if(orig){
+      orig.click();
+      await raf2();
+      requestAnimationFrame(async () => {
+        await rafOnce();
+        const cont = qs(SEL.depListContainer);
+        const latest = collectDependentList(cont);
+        const mm2 = computeMinMaxFromCombos([latest]);
+        if(mm2){
+          const curMin = isFinite(state.globalMin) ? state.globalMin : Infinity;
+          const curMax = isFinite(state.globalMax) ? state.globalMax : -Infinity;
+          const newMin = Math.min(curMin, mm2.min);
+          const newMax = Math.max(curMax, mm2.max);
+          if(newMin !== curMin || newMax !== curMax){
+            state.globalMin = newMin;
+            state.globalMax = newMax;
+            renderMainPriceRange(newMin, newMax);
+          }
+          annotateBadges(cont, latest);
+        }
+      });
+    }
 
                     const mm = computeMinMaxFromCombos(combos);
                     if(mm){
@@ -13983,4 +14004,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: b38df38f88d3997f0341aa7c35c3f56de1316ce2ec539e0fb7ea28844f1d5f6f
+// @integrity-hash: 3ef19505235f254de61cf2410dae038ada7216819b1e2c33a5a9cd9c415cfb81
