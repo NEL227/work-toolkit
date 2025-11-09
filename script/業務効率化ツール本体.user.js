@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.9.1.2
+// @version      1.9.2
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -3647,6 +3647,11 @@ transition: all 0.3s ease-in-out;
         }
 
         function customizeDropDown(shippingSelect) {
+            if (!shippingSelect) return;
+
+            const prevValue = shippingSelect.value;
+            const prevIndex = shippingSelect.selectedIndex;
+
             const order = [
                 "24", "25", "26", "5", "27", "4", "29", "10",
                 "11", "12", "13", "22", "14", "15", "16", "17",
@@ -3657,9 +3662,9 @@ transition: all 0.3s ease-in-out;
                 "24": "12cm×23.5cm以内、厚さ1cm以内\n重さ50g以内",
                 "25": "3辺の合計が60cm以内、1辺の最長は34cm以内、厚さ2cm以内\n重さ1kg以内",
                 "26": "34×25cm以内、厚さ3cm以内\n重さ50g以内",
-                "5": "3辺の合計が60cm以内、1辺の最長は34cm以内、厚さ3cm以内\n重さ1kg以内",
+                "5":  "3辺の合計が60cm以内、1辺の最長は34cm以内、厚さ3cm以内\n重さ1kg以内",
                 "27": "3辺の合計が90cm以内、1辺の最長は60cm以内\n重さ50g以内",
-                "4": "3辺の合計が90cm以内、1辺の最長は60cm以内\n重さ100g以内",
+                "4":  "3辺の合計が90cm以内、1辺の最長は60cm以内\n重さ100g以内",
                 "29": "3辺の合計が90cm以内、1辺の最長は60cm以内\n重さ150g以内",
                 "10": "3辺の合計が90cm以内、1辺の最長は60cm以内\n重さ250g以内",
                 "11": "3辺の合計が60cm以内\n重さ20kg以内",
@@ -3677,22 +3682,40 @@ transition: all 0.3s ease-in-out;
             };
 
             const options = Array.from(shippingSelect.options);
-            const orderedOptions = order.map(value => options.find(option => option.value === value)).filter(Boolean);
+            const valueToOption = new Map(options.map(o => [o.value, o]));
 
-            shippingSelect.innerHTML = '';
-            for (let option of orderedOptions) {
-                shippingSelect.add(option);
+            const seen = new Set();
+            const reordered = [];
+            for (const v of order) {
+                const opt = valueToOption.get(v);
+                if (opt) {
+                    reordered.push(opt);
+                    seen.add(v);
+                }
+            }
+            for (const opt of options) {
+                if (!seen.has(opt.value)) {
+                    reordered.push(opt);
+                }
             }
 
-            for (let option of shippingSelect.options) {
-                if (tooltips[option.value]) {
-                    option.title = tooltips[option.value];
-                }
+            const frag = document.createDocumentFragment();
+            for (const opt of reordered) frag.appendChild(opt);
+            shippingSelect.innerHTML = "";
+            shippingSelect.appendChild(frag);
 
-                if (unusedOptions.includes(option.value)) {
-                    option.style.color = "#8B0000";
-                    option.title = `${tooltips[option.value] || ""} 現在使われていません`.trim();
+            for (const opt of shippingSelect.options) {
+                if (tooltips[opt.value]) opt.title = tooltips[opt.value];
+                if (unusedOptions.includes(opt.value)) {
+                    opt.style.color = "#8B0000";
+                    opt.title = (tooltips[opt.value] ? tooltips[opt.value] + "\n" : "") + "現在使われていません";
                 }
+            }
+
+            if (valueToOption.has(prevValue)) {
+                shippingSelect.value = prevValue;
+            } else if (prevIndex >= 0 && prevIndex < shippingSelect.options.length) {
+                shippingSelect.selectedIndex = prevIndex;
             }
         }
 
@@ -13720,28 +13743,28 @@ transition: all 0.3s ease-in-out;
                         if(orig && btn === orig) continue;
                         combos.push(await clickAndRead(btn));
                     }
-    if(orig){
-      orig.click();
-      await raf2();
-      requestAnimationFrame(async () => {
-        await rafOnce();
-        const cont = qs(SEL.depListContainer);
-        const latest = collectDependentList(cont);
-        const mm2 = computeMinMaxFromCombos([latest]);
-        if(mm2){
-          const curMin = isFinite(state.globalMin) ? state.globalMin : Infinity;
-          const curMax = isFinite(state.globalMax) ? state.globalMax : -Infinity;
-          const newMin = Math.min(curMin, mm2.min);
-          const newMax = Math.max(curMax, mm2.max);
-          if(newMin !== curMin || newMax !== curMax){
-            state.globalMin = newMin;
-            state.globalMax = newMax;
-            renderMainPriceRange(newMin, newMax);
-          }
-          annotateBadges(cont, latest);
-        }
-      });
-    }
+                    if(orig){
+                        orig.click();
+                        await raf2();
+                        requestAnimationFrame(async () => {
+                            await rafOnce();
+                            const cont = qs(SEL.depListContainer);
+                            const latest = collectDependentList(cont);
+                            const mm2 = computeMinMaxFromCombos([latest]);
+                            if(mm2){
+                                const curMin = isFinite(state.globalMin) ? state.globalMin : Infinity;
+                                const curMax = isFinite(state.globalMax) ? state.globalMax : -Infinity;
+                                const newMin = Math.min(curMin, mm2.min);
+                                const newMax = Math.max(curMax, mm2.max);
+                                if(newMin !== curMin || newMax !== curMax){
+                                    state.globalMin = newMin;
+                                    state.globalMax = newMax;
+                                    renderMainPriceRange(newMin, newMax);
+                                }
+                                annotateBadges(cont, latest);
+                            }
+                        });
+                    }
 
                     const mm = computeMinMaxFromCombos(combos);
                     if(mm){
@@ -14004,4 +14027,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: 47436cfd8842571e4c53f13e6a4253d7219f15cd2e61c032ba47428bc213bb93
+// @integrity-hash: 6a785ab3dc89a2ec77374119ff4a3d3d6d98bd6d37b3896ae4c0c24bead99849
