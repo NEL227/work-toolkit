@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.9.2
+// @version      1.9.3
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -5043,6 +5043,8 @@ transition: all 0.3s ease-in-out;
 
         let SELECTOR = null;
         let cleanupProximity = null;
+        let classicMo = null;
+        let lastClassicActiveSig = '';
 
         GM_addStyle(`
   .copyButtonsContainer {
@@ -5291,6 +5293,32 @@ transition: all 0.3s ease-in-out;
             document.body.appendChild(handle);
         }
 
+        function getClassicActiveSig() {
+            const root = document.querySelector('#skuSelection');
+            if (!root) return '';
+            const groups = Array.from(root.querySelectorAll('.feature-item'));
+            return groups.map(g => {
+                const a = g.querySelector('.transverse-filter .sku-filter-button.active .label-name');
+                return (a?.getAttribute('title') || a?.textContent || '').trim();
+            }).join('|');
+        }
+
+        function setupClassicActiveObserver() {
+            if (SELECTOR?.name !== 'classic') return;
+            const target = document.querySelector('#skuSelection');
+            if (!target) return;
+            lastClassicActiveSig = getClassicActiveSig();
+            classicMo?.disconnect();
+            classicMo = new MutationObserver(() => {
+                const sig = getClassicActiveSig();
+                if (sig && sig !== lastClassicActiveSig) {
+                    lastClassicActiveSig = sig;
+                    buildContainer(false);
+                }
+            });
+            classicMo.observe(target, { subtree: true, attributes: true, attributeFilter: ['class'] });
+        }
+
         function buildContainer(flash = false) {
             document.querySelector('.copyButtonsContainer')?.remove();
             document.querySelector('.checkboxList')?.remove();
@@ -5321,6 +5349,7 @@ transition: all 0.3s ease-in-out;
             hideBtn.addEventListener('click', () => {
                 localStorage.setItem('cc_hidden', '1');
                 cleanupProximity?.(); cleanupProximity = null;
+                classicMo?.disconnect(); classicMo = null;
                 container.remove();
                 document.querySelector('.checkboxList')?.remove();
                 createReopenHandle();
@@ -5355,6 +5384,7 @@ transition: all 0.3s ease-in-out;
 
             document.body.appendChild(container);
             cleanupProximity = setupProximityReveal(container);
+            setupClassicActiveObserver();
 
             function togglePinned() {
                 const isPinned = container.classList.toggle('pinned');
@@ -13438,10 +13468,16 @@ transition: all 0.3s ease-in-out;
                 parentItemButton: '.transverse-filter .sku-filter-button',
                 activeButton:     '.sku-filter-button.active',
                 parentItemLabel:  '.label-name',
+                soldOutToggle:    '.show-soldout-info a.v-flex',
             };
 
             const fmtYuan = (n)=>`¥ ${Number(n).toFixed(2)}`;
             function parsePriceNum(text){ const m = String(text||'').match(/(\d+(?:\.\d+)?)/); return m ? Number(m[1]) : NaN; }
+
+            function expandSoldOutSimple(){
+                const t = qs(SEL.soldOutToggle);
+                if (t && t.querySelector('.v-arrow-down')) t.click();
+            }
 
             function isFramedContainer(el) {
                 const cs = getComputedStyle(el);
@@ -13914,7 +13950,50 @@ transition: all 0.3s ease-in-out;
                 }
                 return out;
             }
+            function collectSkuPriceSingle(){
+                const scripts = qsa('script');
+                for(const s of scripts){
+                    const t = s.textContent || '';
+                    const typeMatch = /"skuPriceType"\s*:\s*"([^"]+)"/.exec(t);
+                    if(!typeMatch) continue;
+                    const type = typeMatch[1];
+                    if(type !== 'skuPrice') continue;
+
+                    const keyIdx = t.indexOf('"skuRangePrices"');
+                    if(keyIdx === -1) continue;
+                    const arrStart = t.indexOf('[', keyIdx);
+                    if(arrStart === -1) continue;
+
+                    const arrText = extractBalancedArray(t, arrStart);
+                    const arr = tryJson(arrText);
+                    if(!Array.isArray(arr) || !arr.length) continue;
+
+                    const rows = arr.map(r => ({
+                        b: Number(r?.beginAmount),
+                        p: Number(String(r?.price || '').replace(/[^\d.]/g, ''))
+                    })).filter(r => Number.isFinite(r.b) && Number.isFinite(r.p))
+                    .sort((a,b)=>a.b - b.b);
+
+                    if(!rows.length) continue;
+
+                    const unit = pickNearestUnit(t, keyIdx) || '件';
+                    return { price: rows[0].p, begin: rows[0].b, unit, raw: arr };
+                }
+                return null;
+            }
             function updateMoqFromPage(){
+                const sku = collectSkuPriceSingle();
+                if(sku){
+                    const tier = `≥${sku.begin}${sku.unit} ¥${Number(sku.price).toFixed(2)}`;
+                    state.moqTiers = [tier];
+                    renderMoqTiers(state.moqTiers);
+
+                    state.globalMin = sku.price;
+                    state.globalMax = sku.price;
+                    renderMainPriceRange(sku.price, sku.price);
+                    return;
+                }
+
                 const ori = collectOriginalWithoutPromotion();
                 if(ori && ori.arr?.length){
                     const arr = formatTiersFromOriginal(ori.arr, ori.unit || '件');
@@ -13947,6 +14026,7 @@ transition: all 0.3s ease-in-out;
                 }
                 if(!bodyMo){
                     bodyMo = new MutationObserver(()=>{
+                        expandSoldOutSimple();
                         if(qs(SEL.depListContainer) && !depMo) {
                             depMo = new MutationObserver(()=>schedule(updateBadgesAndMaybeRange));
                             depMo.observe(qs(SEL.depListContainer), { childList:true, subtree:true, characterData:true });
@@ -13972,6 +14052,7 @@ transition: all 0.3s ease-in-out;
                 ensureUnclippedFor(qs(SEL.mainPrice) || getRangeHost());
                 harvestAllActives();
                 updateMoqFromPage();
+                expandSoldOutSimple();
             }
 
             function uninstall(){
@@ -14027,4 +14108,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: 6a785ab3dc89a2ec77374119ff4a3d3d6d98bd6d37b3896ae4c0c24bead99849
+// @integrity-hash: 6319ef7632c20f1861f6addb6b3a194d4fb8f0dabb4d9d51a84d1b5598f30abb
