@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.9.3
+// @version      1.9.4
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -4934,22 +4934,36 @@ transition: all 0.3s ease-in-out;
 
         function addRowNumbers(startIndex, endIndex) {
             const tableRows = document.querySelectorAll('table.hontoroku tbody tr');
+
+            const hasSaveAndSkuStock = !!document.getElementById('saveAndSkuStock');
+
+            const firstNumberedRowIndex = startIndex + (hasSaveAndSkuStock ? 1 : 2);
+            const lastNumberedRowIndex  = hasSaveAndSkuStock ? (endIndex - 1) : endIndex;
+
             tableRows.forEach((row, index) => {
-                const th = document.createElement('th');
-                th.scope = 'row';
-                th.style.textAlign = 'center';
-                if (index >= startIndex && index <= endIndex) {
-                    if (index === startIndex) {
-                        th.innerText = '';
-                    } else if (index <= endIndex - 1) {
-                        th.innerText = index - startIndex;
-                    } else {
-                        th.innerText = '';
-                    }
-                } else {
-                    th.style.display = 'none';
+                let th = row.querySelector('th.sku-rowno');
+                if (!th) {
+                    th = document.createElement('th');
+                    th.className = 'sku-rowno';
+                    th.scope = 'row';
+                    th.style.textAlign = 'center';
+                    row.insertAdjacentElement('afterbegin', th);
                 }
-                row.insertAdjacentElement('afterbegin', th);
+
+                if (index < startIndex || index > endIndex) {
+                    th.style.display = 'none';
+                    th.textContent = '';
+                    return;
+                }
+
+                th.style.display = '';
+
+                if (index < firstNumberedRowIndex || index > lastNumberedRowIndex) {
+                    th.textContent = '';
+                    return;
+                }
+
+                th.textContent = String(index - firstNumberedRowIndex + 1);
             });
         }
 
@@ -14108,4 +14122,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: 6319ef7632c20f1861f6addb6b3a194d4fb8f0dabb4d9d51a84d1b5598f30abb
+// @integrity-hash: 7835144337586108ce82e7cf602bd5964094d2bf0f3b444bc6e22142e1f714cf
