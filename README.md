@@ -33,6 +33,20 @@ GitHub 上のスクリプトを Tampermonkey が正しく読み込むために�
 1. アドレスバーに `chrome://extensions/` と入力してアクセス
 2. 拡張機能ページ右上にある「**デベロッパーモード**」を **オン** にしてください
 
+#### ✅ 【Chromeのみ】追加設定：Tampermonkey の「ユーザー スクリプトを許可する」を ON にする
+
+Chrome では、拡張機能側の設定で「ユーザー スクリプトを許可する」が OFF だと  
+スクリプトがインストールされていても動作しない場合があります。以下も ON にしてください。
+
+1. `chrome://extensions/` を開く
+2. 一覧から **Tampermonkey** の「**詳細**」をクリック
+3. 「**ユーザー スクリプトを許可する**」を **オン** にする
+
+<img width="1913" height="770" alt="画像" src="https://github.com/user-attachments/assets/349653d5-9401-42fe-91a8-bd8e7def0f84" />
+<img width="1067" height="715" alt="画像 (1)" src="https://github.com/user-attachments/assets/3bb96782-c542-4501-8b6a-cb2812d36824" />
+
+---
+
 #### ✅ Edge の場合：
 
 1. アドレスバーに `edge://extensions/` と入力してアクセス
