@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.9.5
+// @version      1.9.5.1
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -9147,7 +9147,7 @@ transition: all 0.3s ease-in-out;
         function highlightCode(inputValue) {
             const combined = (currentCode || '') + (inputValue || '');
 
-            return countByte(combined) >= 21 || containsSpace(combined) || hasInvalidChar(inputValue);
+            return countByte(combined) >= 20 || containsSpace(combined) || hasInvalidChar(inputValue);
         }
 
         function applyHighlight(input, conditionFn, color) {
@@ -9166,7 +9166,7 @@ transition: all 0.3s ease-in-out;
 
             if (!shouldHighlight) {
                 if (countByte(value) < 33) alertTypesSet.delete('over33');
-                if (countByte(combined) < 21) alertTypesSet.delete('over21');
+                if (countByte(combined) < 20) alertTypesSet.delete('over20');
                 if (!containsSpace(value)) alertTypesSet.delete('space');
                 if (!containsSymbols(value)) alertTypesSet.delete('symbol');
                 if (!hasInvalid) alertTypesSet.delete('invalidChar');
@@ -9174,7 +9174,7 @@ transition: all 0.3s ease-in-out;
 
             if (shouldHighlight) {
                 if (countByte(value) >= 33) alertTypesSet.add('over33');
-                if (countByte(combined) >= 21) alertTypesSet.add('over21');
+                if (countByte(combined) >= 20) alertTypesSet.add('over20');
                 if (containsSpace(value)) alertTypesSet.add('space');
                 if (containsSymbols(value)) alertTypesSet.add('symbol');
                 if (hasInvalid) alertTypesSet.add('invalidChar');
@@ -9262,7 +9262,7 @@ transition: all 0.3s ease-in-out;
             if (alertTypesSet.has('space')) messages.push('・コード、または項目名にスペースが含まれています。');
             if (alertTypesSet.has('symbol')) messages.push('・項目名に機種依存文字か半角記号が含まれています。');
             if (alertTypesSet.has('over33')) messages.push('・項目名が32byteを超えています。<br>　32byte以内に収めてください。');
-            if (alertTypesSet.has('over21')) messages.push('・代表商品コード+SKUが20byteを超えています。<br>　20byte以内に収めてください。');
+            if (alertTypesSet.has('over20')) messages.push('・代表商品コード+SKUが20byteを超えています。<br>　20byte以内に収めてください。');
             if (alertTypesSet.has('invalidChar')) messages.push('・コードに使用できない文字が含まれています。');
 
             if (messages.length === 0) {
@@ -9301,7 +9301,7 @@ transition: all 0.3s ease-in-out;
                     const first = inputs[0]?.value || '';
                     const second = inputs[1]?.value || '';
 
-                    if (countByte(currentCode + first) >= 21) alertTypesSet.add('over21');
+                    if (countByte(currentCode + first) >= 20) alertTypesSet.add('over20');
 
                     if (countByte(second) >= 33) alertTypesSet.add('over33');
 
@@ -9423,6 +9423,7 @@ transition: all 0.3s ease-in-out;
         highlightInputs();
         observeDynamicElements();
     }
+
 
     function autoReplaceAxisCode(){
 
@@ -14122,4 +14123,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: 3c601082f1e8c80c549dc2e066297649f4d91559fedaac08b4b44e17b7826599
+// @integrity-hash: e2c7e0743f1ac244cae616b649280c6bded0efc71a7156ac257ec5e65a925be0
