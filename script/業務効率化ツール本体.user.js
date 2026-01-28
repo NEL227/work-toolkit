@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         業務効率化ツール本体
 // @namespace    http://tampermonkey.net/
-// @version      1.9.5.1
+// @version      1.9.6
 // @description  各種スクリプトのセット
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
@@ -3673,12 +3673,12 @@ transition: all 0.3s ease-in-out;
                 "22": "3辺の合計が120cm以内\n重さ20kg以内",
                 "14": "3辺の合計が140cm以内\n重さ20kg以内",
                 "15": "3辺の合計が160cm以内\n重さ20kg以内",
-                "16": "3辺の合計が170cm以内\n重さ20kg以内",
-                "17": "3辺の合計が180cm以内\n重さ20kg以内",
-                "18": "3辺の合計が200cm以内\n重さ20kg以内",
-                "19": "3辺の合計が220cm以内\n重さ20kg以内",
-                "20": "3辺の合計が240cm以内\n重さ20kg以内",
-                "21": "3辺の合計が260cm以内\n重さ20kg以内"
+                "16": "3辺の合計が170cm以内\n重さ20kg以上",
+                "17": "3辺の合計が180cm以内\n重さ20kg以上",
+                "18": "3辺の合計が200cm以内\n重さ20kg以上",
+                "19": "3辺の合計が220cm以内\n重さ20kg以上",
+                "20": "3辺の合計が240cm以内\n重さ20kg以上",
+                "21": "3辺の合計が260cm以内\n重さ20kg以上"
             };
 
             const options = Array.from(shippingSelect.options);
@@ -4932,13 +4932,22 @@ transition: all 0.3s ease-in-out;
             });
         }
 
-        function addRowNumbers(startIndex, endIndex) {
-            const tableRows = document.querySelectorAll('table.hontoroku tbody tr');
+        function addRowNumbers() {
+            // 対象テーブルを特定：ヘッダー行に「数の多い方 (日本語)」を含む table.hontoroku
+            const tables = Array.from(document.querySelectorAll('table.hontoroku'));
+            const targetTable = tables.find(tbl => {
+                const firstRow = tbl.querySelector('tbody > tr');
+                if (!firstRow) return false;
+                return firstRow.textContent.includes('数の多い方 (日本語)');
+            });
 
-            const hasSaveAndSkuStock = !!document.getElementById('saveAndSkuStock');
+            if (!targetTable) return;
 
-            const firstNumberedRowIndex = startIndex + (hasSaveAndSkuStock ? 1 : 2);
-            const lastNumberedRowIndex  = hasSaveAndSkuStock ? (endIndex - 1) : endIndex;
+            const tableRows = targetTable.querySelectorAll('tbody > tr');
+            if (!tableRows.length) return;
+
+            const START_ROW_INDEX = 1; // 2つ目の<tr>から
+            const MAX_NUMBER = 20;
 
             tableRows.forEach((row, index) => {
                 let th = row.querySelector('th.sku-rowno');
@@ -4950,22 +4959,27 @@ transition: all 0.3s ease-in-out;
                     row.insertAdjacentElement('afterbegin', th);
                 }
 
-                if (index < startIndex || index > endIndex) {
-                    th.style.display = 'none';
+                // 先頭行（ヘッダー）は空欄
+                if (index < START_ROW_INDEX) {
+                    th.style.display = '';
+                    th.textContent = '';
+                    return;
+                }
+
+                const num = index - START_ROW_INDEX + 1;
+
+                // 20を超えたら空欄
+                if (num > MAX_NUMBER) {
+                    th.style.display = '';
                     th.textContent = '';
                     return;
                 }
 
                 th.style.display = '';
-
-                if (index < firstNumberedRowIndex || index > lastNumberedRowIndex) {
-                    th.textContent = '';
-                    return;
-                }
-
-                th.textContent = String(index - firstNumberedRowIndex + 1);
+                th.textContent = String(num);
             });
         }
+
 
         function focusFirstInput() {
             const firstInput = document.querySelector('table.hontoroku tr td:nth-child(2) input[type="text"]');
@@ -4993,7 +5007,7 @@ transition: all 0.3s ease-in-out;
             addEventListenersToInputs(inputs);
         });
 
-        addRowNumbers(startIndex, endIndex);
+        addRowNumbers();
     }
 
     function copyMakerStockTable(){
@@ -14123,4 +14137,4 @@ transition: all 0.3s ease-in-out;
 })();
 
 // @integrity-check:toolkit_end
-// @integrity-hash: e2c7e0743f1ac244cae616b649280c6bded0efc71a7156ac257ec5e65a925be0
+// @integrity-hash: f8b0742fc4c552f6d75d08a4e93ce7f89e06e80e1b464c96868fdefeaf4ffefd
